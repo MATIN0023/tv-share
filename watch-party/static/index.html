@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Watch Party - Social</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    /* Login Page */
+    #login-page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    }
+
+    .login-box {
+      background: #1a1a2e;
+      padding: 40px;
+      border-radius: 12px;
+      width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    }
+
+    .login-box h1 {
+      color: #e94560;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    .login-box input {
+      width: 100%;
+      padding: 12px;
+      margin: 10px 0;
+      background: #0f3460;
+      border: 2px solid #333;
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+    }
+
+    .login-box input:focus {
+      border-color: #e94560;
+      outline: none;
+    }
+
+    .login-box button {
+      width: 100%;
+      padding: 12px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+
+    .login-box button:hover {
+      background: #ff6b6b;
+    }
+
+     .login-error {
+       color: #e94560;
+       margin-top: 15px;
+       text-align: center;
+       font-size: 0.9em;
+       min-height: 20px;
+     }
+
+     .login-success {
+       color: #4ade80;
+       margin-top: 15px;
+       text-align: center;
+       font-size: 0.9em;
+       min-height: 20px;
+     }
+
+    /* Main Layout */
+    #main-app {
+      display: none;
+      flex-direction: row;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #16213e;
+      padding: 20px 0;
+      border-right: 2px solid #333;
+    }
+
+    .sidebar-header {
+      padding: 0 20px 20px;
+      border-bottom: 2px solid #333;
+      margin-bottom: 20px;
+    }
+
+    .sidebar-header h2 {
+      color: #e94560;
+    }
+
+    .user-info {
+      font-size: 0.9em;
+      color: #888;
+      margin-top: 5px;
+    }
+
+    .menu-item {
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .menu-item:hover {
+      background: #1a1a2e;
+    }
+
+    .menu-item.active {
+      background: #0f3460;
+      border-left: 3px solid #e94560;
+    }
+
+    .menu-icon {
+      width: 24px;
+      text-align: center;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 20px;
+      border-top: 2px solid #333;
+    }
+
+    .sidebar-footer button {
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      color: #e94560;
+      border: 1px solid #e94560;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .sidebar-footer button:hover {
+      background: #e94560;
+      color: white;
+    }
+
+    /* Content */
+    .content {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+    }
+
+    .page {
+      display: none;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    h1.page-title {
+      margin-bottom: 25px;
+      color: #e94560;
+      font-size: 1.8em;
+    }
+
+    /* Feed Cards */
+    .video-card {
+      background: #1a1a2e;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+
+    .video-card video {
+      width: 100%;
+      max-height: 300px;
+      background: #000;
+    }
+
+    .video-info {
+      padding: 15px;
+    }
+
+    .video-title {
+      font-size: 1.1em;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+
+    .video-meta {
+      font-size: 0.9em;
+      color: #888;
+    }
+
+    .video-meta span {
+      margin-right: 15px;
+    }
+
+    /* History List */
+    .history-item, .friend-item, .room-item {
+      background: #1a1a2e;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .history-info, .room-info {
+      flex: 1;
+    }
+
+    .history-title, .room-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    .history-time, .room-meta {
+      font-size: 0.85em;
+      color: #888;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      background: #e94560;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .btn:hover {
+      background: #ff6b6b;
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid #e94560;
+      color: #e94560;
+    }
+
+    .btn-outline:hover {
+      background: #e94560;
+      color: white;
+    }
+
+    /* Profile Page */
+    .profile-card {
+      background: #1a1a2e;
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 600px;
+    }
+
+    .profile-card input, .profile-card button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 6px;
+      border: 2px solid #333;
+      background: #0f3460;
+      color: white;
+      font-size: 14px;
+    }
+
+    .profile-card button {
+      margin-top: 15px;
+    }
+
+    /* Friend Requests */
+    .friend-request {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .request-actions {
+      margin-left: auto;
+    }
+
+    /* Create Room Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal {
+      background: #1a1a2e;
+      padding: 30px;
+      border-radius: 12px;
+      width: 400px;
+    }
+
+    .modal h2 {
+      color: #e94560;
+      margin-bottom: 20px;
+    }
+
+    .modal input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      border: 2px solid #333;
+      border-radius: 6px;
+      background: #0f3460;
+      color: white;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .hidden { display: none !important; }
+
+    .error-msg {
+      color: #e94560;
+      margin: 10px 0;
+    }
+
+     .avatar {
+       width: 60px;
+       height: 60px;
+       border-radius: 50%;
+       background: #0f3460;
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       font-size: 24px;
+       border: 2px solid #e94560;
+     }
+
+     /* Video Controls */
+     .video-controls {
+       display: flex;
+       gap: 8px;
+       justify-content: center;
+     }
+
+     .video-controls button {
+       padding: 8px 12px;
+       background: #e94560;
+       color: white;
+       border: none;
+       border-radius: 4px;
+       cursor: pointer;
+       font-size: 16px;
+       min-width: 44px;
+       transition: transform 0.2s;
+     }
+
+     .video-controls button:hover {
+       background: #ff6b6b;
+       transform: scale(1.05);
+     }
+
+     /* Video Progress Bar */
+     .video-progress {
+       width: 100%;
+       height: 4px;
+       background: #333;
+       border-radius: 2px;
+       margin: 5px 0;
+     }
+
+     .video-progress-bar {
+       height: 100%;
+       background: #4ade80;
+       border-radius: 2px;
+       transition: width 0.2s;
+     }
+
+     /* User Presence */
+     .presence-indicator {
+       display: inline-block;
+       width: 10px;
+       height: 10px;
+       border-radius: 50%;
+       margin-left: 8px;
+     }
+
+     .presence-online {
+       background: #4ade80;
+     box-shadow: 0 0 4px rgba(74, 222, 128, 0.3);
+     }
+
+     .presence-offline {
+       background: #666;
+     }
+
+     /* Scheduled Videos */
+     .scheduled-video-card {
+       background: #1a1a2e;
+       border: 1px solid #333;
+       border-radius: 8px;
+       padding: 15px;
+       margin-bottom: 15px;
+       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+     }
+
+     .scheduled-video-card.played {
+       opacity: 0.6;
+     }
+
+     .scheduled-info {
+       display: flex;
+       justify-content: space-between;
+       margin-bottom: 8px;
+     }
+
+     .scheduled-title {
+       font-weight: bold;
+       color: #e94560;
+     }
+
+     .scheduled-time {
+       color: #888;
+       font-size: 0.9em;
+     }
+
+     .scheduled-actions {
+       display: flex;
+       gap: 8px;
+     }
+   </style>
+</head>
+<body>
+  <!-- Login Page -->
+  <div id="login-page">
+    <div class="login-box">
+      <h1>🍿 Watch Party</h1>
+      <input type="text" id="username" placeholder="Username" />
+      <input type="password" id="password" placeholder="Password" />
+      <button onclick="login()">Login</button>
+      <button onclick="register()" style="background: transparent; border: 1px solid #e94560; color: #e94560; margin-top: 10px;">Create Account</button>
+      <div id="login-success" class="login-success hidden"></div>
+      <div id="login-error" class="login-error hidden"></div>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="main-app">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h2>🍿</h2>
+        <div class="user-info">
+          <div id="sidebar-username">User</div>
+          <div id="sidebar-display" style="font-size: 0.8em; color: #666;"></div>
+        </div>
+      </div>
+
+      <div class="menu" style="flex: 1;">
+        <div class="menu-item active" onclick="navigate('/hub')" id="menu-home">
+          <span class="menu-icon">🏠</span> Home
+        </div>
+        <div class="menu-item" onclick="navigate('/account')" id="menu-account">
+          <span class="menu-icon">👤</span> Account
+        </div>
+        <div class="menu-item" onclick="navigate('/history')" id="menu-history">
+          <span class="menu-icon">🕒</span> My History
+        </div>
+        <div class="menu-item" onclick="navigate('/friends')" id="menu-friends">
+          <span class="menu-icon">👥</span> My Friends
+        </div>
+        <div class="menu-item" onclick="navigate('/join')" id="menu-join">
+          <span class="menu-icon">🚪</span> Join Room
+        </div>
+        <div class="menu-item" onclick="navigate('/schedule')" id="menu-schedule">
+          <span class="menu-icon">📅</span> Scheduled Videos
+        </div>
+        <div class="menu-item" onclick="navigate('/create-room')" id="menu-create">
+          <span class="menu-icon">➕</span> Create Room
+        </div>
+        <div class="menu-item" onclick="navigate('/settings')" id="menu-settings">
+          <span class="menu-icon">⚙️</span> Settings
+        </div>
+       </div>
+
+     <div class="sidebar-footer">
+        <button onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Home Page (Feed) -->
+      <div id="page-home" class="page active">
+        <h1 class="page-title">Public Videos</h1>
+        <div id="feed-list"></div>
+      </div>
+
+      <!-- Account Page -->
+      <div id="page-account" class="page">
+        <h1 class="page-title">Account</h1>
+        <div class="profile-card">
+          <h3 style="margin-bottom: 15px; color: #e94560;">Profile Settings</h3>
+          <input type="text" id="display-name" placeholder="Display Name" />
+          <input type="text" id="avatar-url" placeholder="Avatar URL" />
+          <button onclick="updateProfile()">Save Profile</button>
+          <div id="profile-msg" class="error-msg hidden"></div>
+        </div>
+      </div>
+
+      <!-- History Page -->
+      <div id="page-history" class="page">
+        <h1 class="page-title">My History</h1>
+        <h3 style="margin: 20px 0 10px; color: #e94560;">Watched Videos</h3>
+        <div id="watch-history-list"></div>
+        <h3 style="margin: 30px 0 10px; color: #e94560;">Joined Rooms</h3>
+        <div id="room-history-list"></div>
+      </div>
+
+      <!-- Friends Page -->
+      <div id="page-friends" class="page">
+        <h1 class="page-title">Friends</h1>
+
+        <h3 style="margin-bottom: 15px;">Friend Requests</h3>
+        <div id="friend-requests"></div>
+
+        <h3 style="margin: 30px 0 15px;">Friends List</h3>
+        <div id="friends-list"></div>
+
+        <div style="margin-top: 30px;">
+          <h3>Add Friend</h3>
+          <div style="display: flex; gap: 10px; max-width: 400px;">
+            <input type="text" id="friend-user-id" placeholder="Friend User ID" style="flex: 1;" />
+            <button onclick="sendFriendRequest()">Send Request</button>
+          </div>
+        </div>
+      </div>
+
+       <!-- Join Room Page -->
+       <div id="page-join" class="page">
+         <h1 class="page-title">Join Room</h1>
+         <div style="max-width: 400px;">
+           <input type="text" id="invite-code-input" placeholder="Enter invite code" />
+           <button onclick="joinWithInvite()">Join</button>
+           <div id="join-msg" class="error-msg hidden"></div>
+         </div>
+       </div>
+
+       <!-- Scheduled Videos -->
+       <div id="page-schedule" class="page">
+         <h1 class="page-title">Scheduled Videos</h1>
+         <div id="scheduled-list"></div>
+       </div>
+
+       <!-- Create Room Page -->
+       <div id="page-create" class="page">
+          <h1 class="page-title">Create Video Room</h1>
+          <div style="max-width: 500px;">
+            <div class="profile-card" style="padding: 25px;">
+              <div style="margin-bottom: 20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:bold;">Room Name</label>
+                <input type="text" id="new-room-name" placeholder="Give your room a name" style="width:100%; padding:12px; border-radius:6px; border:2px solid #333; background:#0f3460; color:white;" />
+              </div>
+
+              <div style="margin-bottom: 25px;">
+                <label style="display:block; margin-bottom:8px; font-weight:bold;">Visibility</label>
+                <div style="display:flex; gap:15px; align-items:center;">
+                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="radio" name="visibility" value="public" checked style="accent-color:#e94560; width:18px; height:18px;" />
+                    <span style="color:#4ade80;">🌐 Public</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                    <input type="radio" name="visibility" value="private" style="accent-color:#e94560; width:18px; height:18px;" />
+                    <span style="color:#fbbf24;">🔒 Private</span>
+                  </label>
+                </div>
+                <p style="color:#888; font-size:0.85em; margin-top:8px;">Public rooms appear in the feed. Private rooms are invite-only.</p>
+              </div>
+
+              <button onclick="createRoom()" style="width:100%; padding:12px; background:#e94560; color:white; border:none; border-radius:6px; font-size:16px; cursor:pointer;">Create Room</button>
+              <div id="create-room-msg" class="error-msg hidden"></div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Settings Page -->
+        <div id="page-settings" class="page">
+          <h1 class="page-title">Settings</h1>
+          <div class="profile-card">
+            <h3 style="margin-bottom: 15px; color: #e94560;">Application Settings</h3>
+            <p style="color: #888; margin-bottom: 15px;">Configure your watch party experience.</p>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="checkbox" id="setting-notifications" checked style="accent-color: #e94560; width: 18px; height: 18px;" />
+                <span>Enable desktop notifications</span>
+              </label>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                <input type="checkbox" id="setting-autoplay" style="accent-color: #e94560; width: 18px; height: 18px;" />
+                <span>Autoplay next video in queue</span>
+              </label>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+              <label style="display: block; margin-bottom: 8px; font-weight: bold;">Video Quality Preference</label>
+              <select id="setting-quality" style="width: 100%; padding: 10px; border-radius: 6px; border: 2px solid #333; background: #0f3460; color: white;">
+                <option value="auto">Auto</option>
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+              </select>
+            </div>
+            
+            <button onclick="saveSettings()" style="width: 100%; padding: 12px; background: #e94560; color: white; border: none; border-radius: 6px; font-size: 16px; cursor: pointer;">Save Settings</button>
+            <div id="settings-msg" class="error-msg hidden"></div>
+          </div>
+        </div>
+        
+     </div>
+   </div>
+
+   <!-- Create Video Room (for uploading) -->
+   <div id="room-modal" class="modal-overlay">
+     <div class="modal">
+       <h2>Video Room</h2>
+       <div id="room-info" style="margin-bottom: 15px; color: #888; font-size: 0.9em;">
+         <span id="room-visibility">Public</span> | 
+         <span id="room-connection">Connected: 0</span> | 
+         <span id="room-last-seen">Last seen: Just now</span>
+       </div>
+       <div id="room-video-player">
+         <video id="modal-video" controls style="width: 100%; border-radius: 8px;"></video>
+         <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+           <button id="play-btn" onclick="togglePlay()" style="padding: 8px 16px; background: #e94560; color: white; border: none; border-radius: 6px; cursor: pointer; display: none;">▶</button>
+           <button id="pause-btn" onclick="togglePlay()" style="padding: 8px 16px; background: transparent; color: #e94560; border: 1px solid #e94560; border-radius: 6px; cursor: pointer; display: inline;">⏸</button>
+           <button onclick="seekTo(0)" style="padding: 8px 12px; background: #333; color: white; border: none; border-radius: 6px; cursor: pointer;">⏮</button>
+           <button onclick="seekTo(100)" style="padding: 8px 12px; background: #333; color: white; border: none; border-radius: 6px; cursor: pointer;">⏭</button>
+         </div>
+         <div style="margin-top: 10px; color: #666; font-size: 0.85em;">
+           <span id="video-timestamp">00:00 / 00:00</span> | 
+           <span id="video-duration">Duration: 0:00</span>
+         </div>
+         <div id="room-chat" style="height: 200px; overflow-y: auto; background: #0f3460; border-radius: 6px; padding: 10px; margin: 15px 0;">
+         </div>
+         <div id="room-input" style="display: flex; gap: 8px;">
+           <input type="text" id="room-chat-input" placeholder="Message..." style="flex: 1;" />
+           <button onclick="sendRoomMessage()">Send</button>
+         </div>
+         <button onclick="closeRoomModal()" style="margin-top: 10px; background: transparent; border: 1px solid #666; color: #888;">Close</button>
+       </div>
+   </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -31,6 +31,11 @@
     --text-primary: #1a1a1a;
     --text-secondary: #666666;
     --border-rgb: 0, 0, 0;
+    --glass-bg: rgba(255, 255, 255, 0.5);
+    --glass-border: rgba(255, 255, 255, 0.35);
+    --glass-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+    --page-grad-start: #f5f7ff;
+    --page-grad-end: #eef2ff;
   }
 
   .dark {
@@ -59,6 +64,11 @@
     --text-primary: #ffffff;
     --text-secondary: #a0a0a0;
     --border-rgb: 255, 255, 255;
+    --glass-bg: rgba(15, 23, 42, 0.45);
+    --glass-border: rgba(148, 163, 184, 0.18);
+    --glass-shadow: 0 18px 40px rgba(2, 6, 23, 0.45);
+    --page-grad-start: #020617;
+    --page-grad-end: #111827;
   }
 }
 
@@ -87,36 +97,28 @@
     color: inherit;
     text-decoration: none;
   }
-  /* app/globals.css - اضافه کن به انتهای فایل */
+}
 
 .liquid-glass {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 
-    0 8px 32px 0 rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
   transition: all 0.3s ease;
 }
 
 .liquid-glass:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 
-    0 12px 40px 0 rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
 }
 
-/* برای دارک مود */
-.dark .liquid-glass {
-  background: rgba(0, 0, 0, 0.3);
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-.dark .liquid-glass:hover {
-  background: rgba(0, 0, 0, 0.4);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
+@layer utilities {
+  .page-glass-bg {
+    background-image: linear-gradient(
+      140deg,
+      var(--page-grad-start) 0%,
+      var(--page-grad-end) 100%
+    );
+  }
 }

@@ -1,11 +1,12 @@
 // components/Navbar.tsx
-'use client';
+"use client";
 
-import React from 'react';
-import styled from 'styled-components';
-import LiquidGlass from 'liquid-glass-react';
-import { ThemeSwitch } from './ThemeSwitch';
-import Link from 'next/link';
+import React from "react";
+import styled from "styled-components";
+import { LiquidButton } from "./ui/liquid-button";
+import { ThemeSwitch } from "./ThemeSwitch";
+import Link from "next/link";
+import { BorderMagicButton } from "@/components/ui/border-magic-button";
 
 const Navbar: React.FC = () => {
   return (
@@ -15,15 +16,16 @@ const Navbar: React.FC = () => {
           <Logo href="/">مــــــــــــوی سیـــــــنک</Logo>
 
           <RightSection>
-            <ThemeSwitch />
             
-            <NavItem className="li" href="/login">ورود</NavItem>
-            <NavItem href="/register">ثبت‌نام</NavItem>
-          </RightSection>
+            <Link href="/login">
+  <BorderMagicButton>ورود</BorderMagicButton>
+</Link>
+<Link href="/signup">
+  <BorderMagicButton>ثبت‌نام</BorderMagicButton>
+</Link>
+         <ThemeSwitch /> </RightSection>
         </NavbarContent>
       </div>
-        
-      
     </NavbarContainer>
   );
 };

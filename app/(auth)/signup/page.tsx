@@ -23,7 +23,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 
 const signupSchema = z
   .object({
@@ -31,10 +31,9 @@ const signupSchema = z
       .string()
       .min(2, "نام باید حداقل ۲ کاراکتر باشد")
       .max(50, "نام نباید بیشتر از ۵۰ کاراکتر باشد"),
-    email: z
+    phone: z
       .string()
-      .min(1, "ایمیل الزامی است")
-      .email("فرمت ایمیل صحیح نیست"),
+      .regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)"),
     password: z
       .string()
       .min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد")
@@ -56,7 +55,7 @@ export default function SignupPage() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       name: "",
-      email: "",
+      phone: "",
       password: "",
       confirmPassword: "",
     },
@@ -64,7 +63,8 @@ export default function SignupPage() {
 
   const onSubmit = async (data: SignupFormValues) => {
     console.log("Signup data:", data);
-    // اینجا API call برای ثبت‌نام می‌زنی
+    // شبیه‌سازی API call
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   };
 
   return (
@@ -105,14 +105,14 @@ export default function SignupPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ایمیل</FormLabel>
+                      <FormLabel>شماره موبایل</FormLabel>
                       <FormControl>
                         <Input
-                          type="email"
-                          placeholder="example@email.com"
+                          type="tel"
+                          placeholder="09123456789"
                           {...field}
                           className="text-left"
                           dir="ltr"
@@ -160,13 +160,17 @@ export default function SignupPage() {
                     </FormItem>
                   )}
                 />
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting ? "در حال ثبت‌نام..." : "ثبت‌نام"}
-                </Button>
+                
+                <div className="pt-2">
+                  <StatefulButton
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                    loadingText="در حال ثبت‌نام..."
+                    successText="ثبت‌نام موفق!"
+                  >
+                    ثبت‌نام
+                  </StatefulButton>
+                </div>
               </form>
             </Form>
           </CardContent>

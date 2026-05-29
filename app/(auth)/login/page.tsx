@@ -23,13 +23,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { StatefulButton } from "@/components/ui/stateful-button";
 
 const loginSchema = z.object({
-  email: z
+  phone: z
     .string()
-    .min(1, "ایمیل الزامی است")
-    .email("فرمت ایمیل صحیح نیست"),
+    .regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)"),
   password: z
     .string()
     .min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد")
@@ -45,14 +44,15 @@ export default function LoginPage() {
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      email: "",
+      phone: "",
       password: "",
     },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
     console.log("Login data:", data);
-    // اینجا API call برای لاگین می‌زنی
+    // شبیه‌سازی API call
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   };
 
   return (
@@ -80,14 +80,14 @@ export default function LoginPage() {
               >
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>ایمیل</FormLabel>
+                      <FormLabel>شماره موبایل</FormLabel>
                       <FormControl>
                         <Input
-                          type="email"
-                          placeholder="example@email.com"
+                          type="tel"
+                          placeholder="09123456789"
                           {...field}
                           className="text-left"
                           dir="ltr"
@@ -124,13 +124,16 @@ export default function LoginPage() {
                     فراموشی رمز عبور؟
                   </Link>
                 </div>
-                <Button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting ? "در حال ورود..." : "ورود"}
-                </Button>
+                <div className="pt-2">
+                  <StatefulButton
+                    type="submit"
+                    disabled={form.formState.isSubmitting}
+                    loadingText="در حال ورود..."
+                    successText="ورود موفق!"
+                  >
+                    ورود
+                  </StatefulButton>
+                </div>
               </form>
             </Form>
           </CardContent>

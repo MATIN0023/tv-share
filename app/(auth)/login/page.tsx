@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { StatefulButton } from "@/components/ui/stateful-button";
+import { useRouter } from "next/navigation";
 
 const loginSchema = z.object({
   phone: z
@@ -41,19 +42,26 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      phone: "",
-      password: "",
-    },
-  });
 
-  const onSubmit = async (data: LoginFormValues) => {
-    console.log("Login data:", data);
-    // شبیه‌سازی API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  };
+    const router = useRouter(); // اضافه کردن هوک روتر
+  
+    const form = useForm<LoginFormValues>({
+      resolver: zodResolver(loginSchema),
+      defaultValues: {
+        phone: "09123456789",
+        password: "Admin123", 
+      },
+    });
+  
+    const onSubmit = async (data: LoginFormValues) => {
+      console.log("Login data:", data);
+      
+      // شبیه‌سازی زمان بارگذاری
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      
+      // انتقال کاربر به صفحه داشبورد
+      router.push("/dashboard");
+    };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-black dark:to-gray-900 p-4">

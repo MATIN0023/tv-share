@@ -1,0 +1,54 @@
+فاز 1 — UI System یکپارچه
+
+یک Design System ثابت: رنگ‌ها، فاصله‌ها، radius، shadow، glass tokens
+استاندارد کردن همه دکمه‌ها روی کامپوننت‌های liquid-button / border-magic-button
+راست‌به‌چپ کامل (RTL) + فونت فارسی + تاریخ/اعداد فارسی
+همگام‌سازی تم در Landing + Dashboard با همان ThemeSwitch
+فاز 2 — صفحات داشبورد (Frontend First)
+
+Overview: کارت KPI، فعالیت اخیر، پیشنهاد فیلم
+Watch Parties/Rooms: لیست روم، ساخت روم، join با کد
+Videos/My Library: watchlist، history، favorites، فیلتر/جستجو
+Friends: درخواست دوستی، لیست دوستان، online status
+Subscription/Billing: پلن فعلی، تمدید، فاکتور
+Profile: اطلاعات کاربر، آواتار، تنظیمات ترجیحات
+همه صفحات با skeleton/loading یکسان و responsive کامل (mobile/tablet/desktop)
+فاز 3 — بک‌اند Go
+
+معماری: Gin یا Fiber + PostgreSQL + Redis + JWT + WebSocket
+ماژول‌ها:
+Auth
+Users/Profile
+Friends
+Rooms/WatchParty (Realtime)
+Library
+Billing/Subscription
+API versioning: /api/v1/...
+OpenAPI/Swagger از اول
+فاز 4 — اتصال Front/Back
+
+لایه API client در فرانت (fetch wrapper + interceptors + refresh token)
+state management (مثلا zustand یا tanstack-query)
+error handling استاندارد + toast فارسی
+fallback/loading/empty states برای همه endpointها
+فاز 5 — Hardening نهایی
+
+a11y، SEO پایه، performance budget
+i18n Persian-first
+تست: unit + integration + e2e
+Docker + CI + staging
+معماری مسیرها (پیشنهاد)
+app/(dashboard)/dashboard
+app/(dashboard)/rooms
+app/(dashboard)/library
+app/(dashboard)/friends
+app/(dashboard)/billing
+app/(dashboard)/profile
+و یک layout مشترک داشبورد که سایدبار + هدر + تم‌سوئیچ + loading boundary را هندل کند.
+
+نکات مهم برای کیفیت Production
+فقط یک سیستم کامپوننت برای Button/Card/Modal (عدم پراکندگی)
+Persian UX واقعی: متن‌ها، خطاها، placeholderها، تاریخ شمسی (در صورت نیاز)
+Responsive واقعی (نه فقط shrink): breakpoint-specific layout
+Realtime rooms با WebSocket از روز اول در طراحی API دیده شود
+Billing از ابتدا event-driven طراحی شود (webhook-ready)

@@ -1,0 +1,835 @@
+basePath: /
+definitions:
+  handlers.acceptInviteRequest:
+    properties:
+      code:
+        type: string
+    type: object
+  handlers.createRoomRequest:
+    properties:
+      background:
+        type: string
+      name:
+        type: string
+      visibility:
+        type: string
+    type: object
+  handlers.friendActionRequest:
+    properties:
+      from_user_id:
+        type: string
+      to_user_id:
+        type: string
+    type: object
+  handlers.loginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.registerRequest:
+    properties:
+      display_name:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.scheduleVideoRequest:
+    properties:
+      description:
+        type: string
+      room_id:
+        type: string
+      scheduled_at:
+        type: string
+      title:
+        type: string
+      video_url:
+        type: string
+    type: object
+  handlers.seekRequest:
+    properties:
+      current_time:
+        type: number
+    type: object
+  handlers.swaggerMessage:
+    properties:
+      content:
+        type: string
+      id:
+        type: string
+      room_id:
+        type: string
+      sender_id:
+        type: string
+      sender_name:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  handlers.swaggerRoom:
+    properties:
+      background:
+        type: string
+      created_at:
+        type: string
+      current_time:
+        type: number
+      duration:
+        type: number
+      id:
+        type: string
+      is_paused:
+        type: boolean
+      is_playing:
+        type: boolean
+      name:
+        type: string
+      owner_id:
+        type: string
+      video_path:
+        type: string
+      visibility:
+        type: string
+    type: object
+  handlers.swaggerScheduledVideo:
+    properties:
+      created_at:
+        type: string
+      created_by:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_played:
+        type: boolean
+      room_id:
+        type: string
+      scheduled_for:
+        type: string
+      title:
+        type: string
+      video_url:
+        type: string
+    type: object
+  handlers.swaggerUser:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        type: string
+      birthday:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      created_at:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      family_name:
+        type: string
+      gender:
+        type: string
+      id:
+        type: string
+      phone:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.swaggerVideoFeed:
+    properties:
+      created_at:
+        type: string
+      owner_avatar:
+        type: string
+      owner_id:
+        type: string
+      owner_name:
+        type: string
+      room_id:
+        type: string
+      room_name:
+        type: string
+      video_path:
+        type: string
+    type: object
+  handlers.swaggerWatchHistory:
+    properties:
+      duration:
+        type: integer
+      id:
+        type: string
+      room_id:
+        type: string
+      room_name:
+        type: string
+      user_id:
+        type: string
+      video_path:
+        type: string
+      watched_at:
+        type: string
+    type: object
+  handlers.updateProfileRequest:
+    properties:
+      avatar_url:
+        type: string
+      bio:
+        type: string
+      birthday:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      display_name:
+        type: string
+      email:
+        type: string
+      family_name:
+        type: string
+      gender:
+        type: string
+      phone:
+        type: string
+    type: object
+  handlers.updateRoomVideoRequest:
+    properties:
+      video_url:
+        type: string
+    type: object
+host: localhost:8090
+info:
+  contact: {}
+  description: JSON API and WebSocket backend for TV Share watch parties.
+  title: Watch Party API
+  version: "1.0"
+paths:
+  /api/feed:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerVideoFeed'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get public video feed
+      tags:
+      - feed
+  /api/friends:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List accepted friends
+      tags:
+      - friends
+  /api/friends/requests:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List pending friend requests
+      tags:
+      - friends
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Target user
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.friendActionRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send friend request
+      tags:
+      - friends
+  /api/friends/requests/accept:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Requester user ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.friendActionRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Accept friend request
+      tags:
+      - friends
+  /api/friends/requests/reject:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Requester user ID
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.friendActionRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Reject friend request
+      tags:
+      - friends
+  /api/invitations/accept:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Invitation code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.acceptInviteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Accept invitation by code
+      tags:
+      - invitations
+  /api/room-history:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerRoom'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get rooms from user watch history
+      tags:
+      - history
+  /api/rooms:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerRoom'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List all rooms
+      tags:
+      - rooms
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Room payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.createRoomRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.swaggerRoom'
+      security:
+      - BearerAuth: []
+      summary: Create a watch room
+      tags:
+      - rooms
+  /api/rooms/{id}:
+    get:
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.swaggerRoom'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get room by ID
+      tags:
+      - rooms
+  /api/rooms/{id}/invitations:
+    post:
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create room invitation
+      tags:
+      - invitations
+  /api/rooms/{id}/messages:
+    get:
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerMessage'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get room chat messages
+      tags:
+      - messages
+  /api/rooms/{id}/playback/pause:
+    post:
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.swaggerRoom'
+      security:
+      - BearerAuth: []
+      summary: Pause room playback
+      tags:
+      - playback
+  /api/rooms/{id}/playback/play:
+    post:
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.swaggerRoom'
+      security:
+      - BearerAuth: []
+      summary: Start room playback
+      tags:
+      - playback
+  /api/rooms/{id}/playback/seek:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Seek position
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.seekRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.swaggerRoom'
+      security:
+      - BearerAuth: []
+      summary: Seek room playback position
+      tags:
+      - playback
+  /api/rooms/{id}/video:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Room ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Video URL
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateRoomVideoRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set room video URL
+      tags:
+      - rooms
+  /api/rooms/search:
+    get:
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerRoom'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Search rooms
+      tags:
+      - rooms
+  /api/schedule:
+    get:
+      parameters:
+      - description: 'Filter: all, played, pending'
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerScheduledVideo'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List scheduled videos for current user
+      tags:
+      - schedule
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Schedule payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.scheduleVideoRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Schedule a video for a room
+      tags:
+      - schedule
+  /api/schedule/{id}:
+    delete:
+      parameters:
+      - description: Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete a scheduled video
+      tags:
+      - schedule
+  /api/schedule/{id}/complete:
+    post:
+      parameters:
+      - description: Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark scheduled video as played
+      tags:
+      - schedule
+  /api/users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List users
+      tags:
+      - users
+  /api/users/me:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.swaggerUser'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get authenticated user profile
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Profile fields
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.updateProfileRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.swaggerUser'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update authenticated user profile
+      tags:
+      - users
+  /api/watch-history:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.swaggerWatchHistory'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Get authenticated user watch history
+      tags:
+      - history
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Authenticate user
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Registration payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

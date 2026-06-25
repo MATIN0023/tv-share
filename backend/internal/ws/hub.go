@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"log"
 
 	"watch-party/internal/models"
@@ -33,19 +34,20 @@ func NewHub(repo *repository.Repository) *Hub {
 }
 
 func (h *Hub) loadRoomsFromDB() {
-	rooms, err := h.repo.ListRooms()
+	rooms, err := h.repo.ListRooms(context.Background())
 	if err != nil {
 		log.Println("Failed to load rooms:", err)
 		return
 	}
 	for _, room := range rooms {
-		h.rooms[room.ID] = &roomState{Room: room, Clients: make(map[*Client]bool)}
+		h.rooms[room.ID.Hex()] = &roomState{Room: room, Clients: make(map[*Client]bool)}
 	}
 }
 
 func (h *Hub) AddRoom(room *models.Room) {
-	if _, ok := h.rooms[room.ID]; !ok {
-		h.rooms[room.ID] = &roomState{Room: *room, Clients: make(map[*Client]bool)}
+	id := room.ID.Hex()
+	if _, ok := h.rooms[id]; !ok {
+		h.rooms[id] = &roomState{Room: *room, Clients: make(map[*Client]bool)}
 	}
 }
 
@@ -63,13 +65,13 @@ func (h *Hub) Run() {
 				continue
 			}
 			state.Clients[client] = true
-			messages, _ := h.repo.GetMessages(client.roomID, 100)
+			messages, _ := h.repo.GetMessages(context.Background(), client.roomID, 100)
 			for _, msg := range messages {
 				client.send <- &Message{
 					Type:   "chat",
 					Text:   msg.Content,
 					From:   msg.SenderName,
-					FromID: msg.SenderID,
+					FromID: msg.SenderID.Hex(),
 					Time:   msg.Timestamp.Format("15:04"),
 				}
 			}
@@ -110,7 +112,7 @@ func (h *Hub) BroadcastRoomState(roomID string) {
 	if !ok {
 		return
 	}
-	room, err := h.repo.GetRoom(roomID)
+	room, err := h.repo.GetRoom(context.Background(), roomID)
 	if err == nil {
 		state.Room = *room
 	}

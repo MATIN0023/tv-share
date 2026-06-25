@@ -1,50 +1,68 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
+	"errors"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+
 	"watch-party/internal/models"
-	"watch-party/internal/util"
 )
 
-func (r *Repository) CreateInvitation(roomID, code string, expiresAt time.Time, maxUses int) error {
-	id := util.GenerateID()
-	_, err := r.db.Exec(
-		`INSERT INTO invitations (id, room_id, code, expires_at, max_uses) VALUES (?, ?, ?, ?, ?)`,
-		id, roomID, code, expiresAt, maxUses,
+func (r *Repository) CreateInvitation(ctx context.Context, roomID, code string, expiresAt time.Time, maxUses int) error {
+	roomOID, err := parseObjectID(roomID)
+	if err != nil {
+		return err
+	}
+	inv := models.Invitation{
+		ID:        primitive.NewObjectID(),
+		RoomID:    roomOID,
+		Code:      code,
+		ExpiresAt: expiresAt.UTC(),
+		MaxUses:   maxUses,
+		UsedCount: 0,
+		CreatedAt: models.NowUTC(),
+	}
+	_, err = r.coll(collInvitations).InsertOne(ctx, inv)
+	return err
+}
+
+func (r *Repository) GetInvitationByCode(ctx context.Context, code string) (*models.Invitation, error) {
+	var inv models.Invitation
+	err := r.coll(collInvitations).FindOne(ctx, bson.M{"code": code}).Decode(&inv)
+	if err != nil {
+		return nil, err
+	}
+	return &inv, nil
+}
+
+func (r *Repository) ValidateInvitation(ctx context.Context, code string) (*models.Invitation, error) {
+	inv, err := r.GetInvitationByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	if time.Now().UTC().After(inv.ExpiresAt) {
+		return nil, mongo.ErrNoDocuments
+	}
+	if inv.UsedCount >= inv.MaxUses {
+		return nil, mongo.ErrNoDocuments
+	}
+	return inv, nil
+}
+
+func (r *Repository) UseInvitation(ctx context.Context, code string) error {
+	res, err := r.coll(collInvitations).UpdateOne(ctx,
+		bson.M{"code": code},
+		bson.M{"$inc": bson.M{"used_count": 1}},
 	)
-	return err
-}
-
-func (r *Repository) GetInvitationByCode(code string) (*models.Invitation, error) {
-	row := r.db.QueryRow(`
-		SELECT id, room_id, code, expires_at, max_uses, used_count
-		FROM invitations WHERE code = ?
-	`, code)
-	i := &models.Invitation{}
-	err := row.Scan(&i.ID, &i.RoomID, &i.Code, &i.ExpiresAt, &i.MaxUses, &i.UsedCount)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return i, nil
-}
-
-func (r *Repository) ValidateInvitation(code string) (*models.Invitation, error) {
-	i, err := r.GetInvitationByCode(code)
-	if err != nil {
-		return nil, err
+	if res.MatchedCount == 0 {
+		return errors.New("invitation not found")
 	}
-	if time.Now().After(i.ExpiresAt) {
-		return nil, sql.ErrNoRows
-	}
-	if i.UsedCount >= i.MaxUses {
-		return nil, sql.ErrNoRows
-	}
-	return i, nil
-}
-
-func (r *Repository) UseInvitation(code string) error {
-	_, err := r.db.Exec(`UPDATE invitations SET used_count = used_count + 1 WHERE code = ?`, code)
-	return err
+	return nil
 }

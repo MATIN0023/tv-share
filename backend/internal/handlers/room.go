@@ -46,16 +46,9 @@ func (h *Handler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		req.Background = "default"
 	}
 
-	id := util.GenerateID()
-	uid := userID(r)
-	if err := h.Repo.CreateRoom(id, req.Name, uid, req.Visibility, req.Background); err != nil {
-		WriteJSONError(w, http.StatusInternalServerError, "Failed to create room")
-		return
-	}
-
-	room, err := h.Repo.GetRoom(id)
+	room, err := h.Repo.CreateRoom(r.Context(), req.Name, userID(r), req.Visibility, req.Background)
 	if err != nil {
-		WriteJSONError(w, http.StatusInternalServerError, "Failed to retrieve room")
+		WriteJSONError(w, http.StatusInternalServerError, "Failed to create room")
 		return
 	}
 	h.Hub.AddRoom(room)
@@ -70,7 +63,7 @@ func (h *Handler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} swaggerRoom
 // @Router /api/rooms [get]
 func (h *Handler) ListRooms(w http.ResponseWriter, r *http.Request) {
-	rooms, err := h.Repo.ListRooms()
+	rooms, err := h.Repo.ListRooms(r.Context())
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to list rooms")
 		return
@@ -92,7 +85,7 @@ func (h *Handler) SearchRooms(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "Query parameter required")
 		return
 	}
-	rooms, err := h.Repo.SearchRooms(query)
+	rooms, err := h.Repo.SearchRooms(r.Context(), query)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to search rooms")
 		return
@@ -111,7 +104,7 @@ func (h *Handler) SearchRooms(w http.ResponseWriter, r *http.Request) {
 // @Router /api/rooms/{id} [get]
 func (h *Handler) GetRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
-	room, err := h.Repo.GetRoom(roomID)
+	room, err := h.Repo.GetRoom(r.Context(), roomID)
 	if err != nil {
 		WriteJSONError(w, http.StatusNotFound, "Room not found")
 		return
@@ -133,12 +126,12 @@ func (h *Handler) UpdateRoomVideo(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
 	uid := userID(r)
 
-	room, err := h.Repo.GetRoom(roomID)
+	room, err := h.Repo.GetRoom(r.Context(), roomID)
 	if err != nil {
 		WriteJSONError(w, http.StatusNotFound, "Room not found")
 		return
 	}
-	if room.OwnerID != uid {
+	if room.OwnerID.Hex() != uid {
 		WriteJSONError(w, http.StatusForbidden, "Only room owner can update video")
 		return
 	}
@@ -149,7 +142,9 @@ func (h *Handler) UpdateRoomVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.Repo.UpdateRoomVideo(roomID, req.VideoURL); err != nil {
+	_, _ = h.Repo.CreateVideo(r.Context(), uid, room.Title, req.VideoURL)
+
+	if err := h.Repo.UpdateRoomVideo(r.Context(), roomID, req.VideoURL); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to update room")
 		return
 	}
@@ -171,8 +166,8 @@ func (h *Handler) UpdateRoomVideo(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateInvitation(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
 	code := util.GenerateInviteCode()
-	expires := time.Now().Add(24 * time.Hour)
-	if err := h.Repo.CreateInvitation(roomID, code, expires, 1); err != nil {
+	expires := time.Now().UTC().Add(24 * time.Hour)
+	if err := h.Repo.CreateInvitation(r.Context(), roomID, code, expires, 1); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create invitation")
 		return
 	}
@@ -202,16 +197,16 @@ func (h *Handler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	inv, err := h.Repo.ValidateInvitation(req.Code)
+	inv, err := h.Repo.ValidateInvitation(r.Context(), req.Code)
 	if err != nil {
 		WriteJSONError(w, http.StatusNotFound, "Invalid or expired invitation")
 		return
 	}
-	if err := h.Repo.UseInvitation(req.Code); err != nil {
+	if err := h.Repo.UseInvitation(r.Context(), req.Code); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to accept invitation")
 		return
 	}
-	WriteJSON(w, http.StatusOK, map[string]string{"room_id": inv.RoomID})
+	WriteJSON(w, http.StatusOK, map[string]string{"room_id": inv.RoomID.Hex()})
 }
 
 // GetRoomMessages godoc
@@ -224,7 +219,7 @@ func (h *Handler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 // @Router /api/rooms/{id}/messages [get]
 func (h *Handler) GetRoomMessages(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
-	messages, err := h.Repo.GetMessages(roomID, 100)
+	messages, err := h.Repo.GetMessages(r.Context(), roomID, 100)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to load messages")
 		return
@@ -273,22 +268,22 @@ func (h *Handler) SeekVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room, err := h.Repo.GetRoom(roomID)
+	room, err := h.Repo.GetRoom(r.Context(), roomID)
 	if err != nil {
 		WriteJSONError(w, http.StatusNotFound, "Room not found")
 		return
 	}
-	if room.OwnerID != uid {
+	if room.OwnerID.Hex() != uid {
 		WriteJSONError(w, http.StatusForbidden, "Only room owner can control playback")
 		return
 	}
 
 	room.CurrentTime = req.CurrentTime
-	if err := h.Repo.UpdateRoomPlayback(room); err != nil {
+	if err := h.Repo.UpdateRoomPlayback(r.Context(), room); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to update playback state")
 		return
 	}
-	h.Hub.BroadcastRoomState(room.ID)
+	h.Hub.BroadcastRoomState(roomID)
 	WriteJSON(w, http.StatusOK, room)
 }
 
@@ -296,22 +291,22 @@ func (h *Handler) updatePlayback(w http.ResponseWriter, r *http.Request, playing
 	roomID := mux.Vars(r)["id"]
 	uid := userID(r)
 
-	room, err := h.Repo.GetRoom(roomID)
+	room, err := h.Repo.GetRoom(r.Context(), roomID)
 	if err != nil {
 		WriteJSONError(w, http.StatusNotFound, "Room not found")
 		return
 	}
-	if room.OwnerID != uid {
+	if room.OwnerID.Hex() != uid {
 		WriteJSONError(w, http.StatusForbidden, "Only room owner can control playback")
 		return
 	}
 
 	room.IsPlaying = playing
 	room.IsPaused = paused
-	if err := h.Repo.UpdateRoomPlayback(room); err != nil {
+	if err := h.Repo.UpdateRoomPlayback(r.Context(), room); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to update playback state")
 		return
 	}
-	h.Hub.BroadcastRoomState(room.ID)
+	h.Hub.BroadcastRoomState(roomID)
 	WriteJSON(w, http.StatusOK, room)
 }

@@ -1,82 +1,87 @@
- "use client";
+"use client";
 
 import { useState } from "react";
 import { GlassPanel } from "@/components/dashboard/glass-panel";
 import { SectionHeader } from "@/components/dashboard/section-header";
-import { CreditCard, CalendarClock, ReceiptText } from "lucide-react";
+import { CreditCard, CalendarClock } from "lucide-react";
 import { PlanCard } from "@/components/dashboard/cards/plan-card";
 import { TransactionsTable } from "@/components/dashboard/tables/transactions-table";
 import { UpgradePlanModal } from "@/components/dashboard/modals/upgrade-plan-modal";
 import { ErrorState } from "@/components/dashboard/shared/error-state";
-
-const invoices = [
-  { id: "#MS-2401", amount: "۲۹۹,۰۰۰ تومان", date: "۱۴۰۵/۰۲/۲۱", status: "موفق" },
-  { id: "#MS-2312", amount: "۲۹۹,۰۰۰ تومان", date: "۱۴۰۵/۰۱/۲۱", status: "موفق" },
-];
+import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
+import {
+  usePlans,
+  useSubscription,
+  useTransactions,
+  useUpgradeSubscription,
+} from "@/hooks/use-billing";
+import { formatFaDate } from "@/lib/utils/format-date";
 
 export default function BillingPage() {
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+  const subQ = useSubscription();
+  const txQ = useTransactions();
+  const plansQ = usePlans();
+  const upgradeMut = useUpgradeSubscription();
+
+  const invoices = (txQ.data?.transactions ?? []).map((t) => ({
+    id: t.gateway_reference || t.id.slice(-8),
+    amount: `${t.amount.toLocaleString("fa-IR")} تومان`,
+    date: formatFaDate(t.created_at),
+    status: t.status,
+  }));
+
+  const loading = subQ.isLoading || txQ.isLoading || plansQ.isLoading;
+
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div>
       <SectionHeader
         title="اشتراک / پرداخت"
-        description="نمای پلن فعلی، تاریخ تمدید و سوابق پرداخت."
+        description="مدیریت اشتراک، فاکتورها و ارتقای پلن"
       />
+
+      {subQ.isError || txQ.isError ? (
+        <ErrorState
+          title="خطا در دریافت اطلاعات billing"
+          onRetry={() => {
+            subQ.refetch();
+            txQ.refetch();
+            plansQ.refetch();
+          }}
+        />
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <GlassPanel title="پلن فعلی" description="پلن Professional ماهانه">
+        <GlassPanel title="پلن فعلی">
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <CreditCard className="size-4" />
-            مبلغ: ۲۹۹,۰۰۰ تومان
+            {subQ.data?.plan ?? "free"}
           </div>
         </GlassPanel>
-        <GlassPanel title="زمان تمدید" description="۶ روز تا تمدید خودکار باقی مانده">
+        <GlassPanel title="تمدید">
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <CalendarClock className="size-4" />
-            تاریخ: ۱۴۰۵/۰۳/۰۳
+            {subQ.data?.subscription_expires_at
+              ? formatFaDate(subQ.data.subscription_expires_at)
+              : "—"}
           </div>
         </GlassPanel>
-        <GlassPanel title="تخفیف فعال" description="کد SPRING20 تا پایان ماه معتبر است." />
-      </div>
-
-      <div className="mt-4 md:mt-6">
-        <GlassPanel title="Usage Meters" description="مصرف منابع پلن فعلی.">
-          <div className="mt-3 space-y-3 text-sm">
-            <div>
-              <div className="mb-1 flex justify-between">
-                <span>آپلود</span>
-                <span>5GB / 10GB</span>
-              </div>
-              <div className="h-2 rounded-full bg-white/10">
-                <div className="h-2 w-1/2 rounded-full bg-primary" />
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 flex justify-between">
-                <span>اتاق ماهانه</span>
-                <span>18 / 30</span>
-              </div>
-              <div className="h-2 rounded-full bg-white/10">
-                <div className="h-2 w-3/5 rounded-full bg-primary" />
-              </div>
-            </div>
-          </div>
-        </GlassPanel>
+        <GlassPanel title="تراکنش‌ها" description={`${invoices.length} مورد`} />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3 md:mt-6">
-        <PlanCard name="Free" price="0 تومان" features={["720p", "2 rooms", "limited upload"]} />
-        <PlanCard
-          name="Pro"
-          price="299,000 تومان"
-          features={["1080p", "30 rooms", "10GB upload"]}
-          highlighted
-        />
-        <PlanCard
-          name="Family"
-          price="499,000 تومان"
-          features={["4K", "100 rooms", "40GB upload"]}
-        />
+        {(plansQ.data?.plans ?? []).map((plan) => (
+          <PlanCard
+            key={plan.id}
+            name={plan.name}
+            price={`${plan.price.toLocaleString("fa-IR")} ${plan.currency}`}
+            features={plan.features ?? []}
+            highlighted={plan.slug === subQ.data?.plan}
+          />
+        ))}
       </div>
 
       <button
@@ -88,29 +93,26 @@ export default function BillingPage() {
       </button>
 
       <div className="mt-4 md:mt-6">
-        <GlassPanel title="Permission State" description="وضعیت دسترسی بر اساس پلن شما.">
-          <div className="mt-3 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-300">
-            پلن فعلی شما اجازه استریم 4K ندارد. برای فعال‌سازی، پلن را ارتقا دهید.
-          </div>
-        </GlassPanel>
-      </div>
-
-      <div className="mt-4 md:mt-6">
-        <GlassPanel title="سوابق پرداخت" description="آخرین فاکتورهای صادرشده برای اشتراک.">
-          <div className="mt-3">
+        <GlassPanel title="سوابق پرداخت">
+          {invoices.length ? (
             <TransactionsTable rows={invoices} />
-          </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">تراکنشی نیست</p>
+          )}
         </GlassPanel>
       </div>
 
-      <div className="mt-4 md:mt-6">
-        <ErrorState
-          title="نمونه وضعیت خطا"
-          description="در صورت خطای دریافت تراکنش‌ها این حالت به کاربر نمایش داده می‌شود."
-        />
-      </div>
-
-      <UpgradePlanModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+      <UpgradePlanModal
+        open={upgradeOpen}
+        onClose={() => setUpgradeOpen(false)}
+        plans={plansQ.data?.plans}
+        isSubmitting={upgradeMut.isPending}
+        onUpgrade={async (slug, discountCode) => {
+          const res = await upgradeMut.mutateAsync({ planSlug: slug, discountCode });
+          if (res.payment_url) window.open(res.payment_url, "_blank");
+          setUpgradeOpen(false);
+        }}
+      />
     </div>
   );
 }

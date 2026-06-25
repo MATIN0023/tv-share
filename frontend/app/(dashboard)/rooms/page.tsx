@@ -1,6 +1,7 @@
- "use client";
+"use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { GlassPanel } from "@/components/dashboard/glass-panel";
 import { SectionHeader } from "@/components/dashboard/section-header";
 import { Users, Wifi, Plus } from "lucide-react";
@@ -8,47 +9,43 @@ import { RoomsTable } from "@/components/dashboard/tables/rooms-table";
 import { CreateRoomModal } from "@/components/dashboard/modals/create-room-modal";
 import { JoinRoomModal } from "@/components/dashboard/modals/join-room-modal";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
-
-const rooms = [
-  { name: "Interstellar Night", members: "۵/۸", status: "Active", startAt: "الان" },
-  { name: "Marvel Marathon", members: "۷/۱۰", status: "Scheduled", startAt: "امشب 22:30" },
-  { name: "Anime Weekend", members: "۲/۶", status: "History", startAt: "دیروز" },
-];
+import { ErrorState } from "@/components/dashboard/shared/error-state";
+import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
+import { useAcceptInvitation, useCreateRoom, useRooms } from "@/hooks/use-rooms";
+import { ApiError } from "@/lib/api";
+import { formatFaDate } from "@/lib/utils/format-date";
 
 export default function RoomsPage() {
-  const [tab, setTab] = useState<"Active" | "Scheduled" | "History">("Active");
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const router = useRouter();
 
-  const filteredRooms = useMemo(() => rooms.filter((room) => room.status === tab), [tab]);
+  const { data: rooms, isLoading, isError, refetch } = useRooms();
+  const createRoom = useCreateRoom();
+  const acceptInvite = useAcceptInvitation();
+
+  const rows = useMemo(
+    () =>
+      (rooms ?? []).map((room) => ({
+        id: room.id,
+        name: room.name,
+        members: "—",
+        status: room.is_playing ? "Active" : room.status ?? "—",
+        startAt: room.created_at ? formatFaDate(room.created_at) : "—",
+      })),
+    [rooms]
+  );
 
   return (
     <div>
       <SectionHeader
         title="روم‌ها / واچ پارتی"
-        description="ساخت روم جدید، پیوستن با کد، مدیریت کاربران و وضعیت همگام‌سازی پخش."
+        description="ساخت، پیوستن با کد دعوت و مدیریت اتاق‌ها"
       />
 
-      <div className="mb-4 flex flex-wrap gap-2 md:mb-6">
-        {(["Active", "Scheduled", "History"] as const).map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => setTab(item)}
-            className={`rounded-xl border px-3 py-2 text-sm ${
-              tab === item ? "border-primary text-primary" : "border-white/20"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <GlassPanel
-          title="ساخت روم"
-          description="با یک کلیک، روم جدید بساز و لینک دعوت بفرست."
-        >
+        <GlassPanel title="ساخت روم">
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
@@ -59,59 +56,78 @@ export default function RoomsPage() {
           </button>
           <button
             type="button"
-            onClick={() => setJoinOpen(true)}
+            onClick={() => {
+              setJoinError(null);
+              setJoinOpen(true);
+            }}
             className="mt-2 inline-flex rounded-xl border border-white/20 px-3 py-2 text-sm"
           >
             پیوستن با کد
           </button>
         </GlassPanel>
 
-        <GlassPanel
-          title="پایداری اتصال"
-          description="وضعیت همگام‌سازی پخش، زیرنویس و چت گروهی."
-        >
+        <GlassPanel title="اتاق‌های ثبت‌شده">
           <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-500">
             <Wifi className="size-4" />
-            اتصال پایدار (۹۹٫۲٪)
+            {rooms?.length ?? 0} اتاق
           </div>
         </GlassPanel>
 
-        <GlassPanel
-          title="اعضای آنلاین"
-          description="در حال حاضر ۱۲ دوست آنلاین و آماده پیوستن هستند."
-        >
+        <GlassPanel title="در حال پخش">
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="size-4" />
-            آنلاین: ۱۲ کاربر
+            فعال: {rooms?.filter((r) => r.is_playing).length ?? 0}
           </div>
         </GlassPanel>
       </div>
 
       <div className="mt-4 md:mt-6">
-        <GlassPanel title="لیست روم‌ها" description="مدیریت سریع روم‌های فعال و زمان‌بندی‌شده.">
+        <GlassPanel title="لیست روم‌ها">
           <div className="mt-3">
-            {filteredRooms.length ? (
-              <RoomsTable rows={filteredRooms} />
-            ) : (
-              <EmptyState title="اتاقی پیدا نشد" description="برای این تب هنوز داده‌ای وجود ندارد." />
-            )}
+            {isLoading ? <DashboardSkeleton /> : null}
+            {isError ? (
+              <ErrorState
+                title="خطا در دریافت اتاق‌ها"
+                onRetry={() => refetch()}
+              />
+            ) : null}
+            {!isLoading && !isError && rows.length ? <RoomsTable rows={rows} /> : null}
+            {!isLoading && !isError && !rows.length ? (
+              <EmptyState title="اتاقی وجود ندارد" />
+            ) : null}
           </div>
         </GlassPanel>
       </div>
 
-      <div className="mt-4 md:mt-6">
-        <GlassPanel
-          title="Room Details Drawer (Preview)"
-          description="اعضا، کنترل‌های میزبان و وضعیت Sync اینجا نمایش داده می‌شود."
-        >
-          <div className="mt-3 rounded-xl border border-white/10 p-3 text-sm text-muted-foreground">
-            اعضا: علی، مهدی، الهام | Host controls: pause, seek, mute all | Sync: 99.2%
-          </div>
-        </GlassPanel>
-      </div>
-
-      <CreateRoomModal open={createOpen} onClose={() => setCreateOpen(false)} />
-      <JoinRoomModal open={joinOpen} onClose={() => setJoinOpen(false)} />
+      <CreateRoomModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        isSubmitting={createRoom.isPending}
+        onSubmit={async (payload) => {
+          const room = await createRoom.mutateAsync({
+            name: payload.name,
+            visibility: payload.visibility,
+          });
+          router.push(`/rooms/${room.id}`);
+        }}
+      />
+      <JoinRoomModal
+        open={joinOpen}
+        onClose={() => setJoinOpen(false)}
+        isSubmitting={acceptInvite.isPending}
+        error={joinError}
+        onSubmit={async (code) => {
+          try {
+            const res = await acceptInvite.mutateAsync(code);
+            setJoinOpen(false);
+            router.push(`/rooms/${res.room_id}`);
+          } catch (e) {
+            setJoinError(
+              e instanceof ApiError ? e.message : "کد دعوت نامعتبر است"
+            );
+          }
+        }}
+      />
     </div>
   );
 }

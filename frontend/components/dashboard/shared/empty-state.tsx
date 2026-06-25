@@ -2,7 +2,7 @@ import { Inbox } from "lucide-react";
 
 interface EmptyStateProps {
   title: string;
-  description: string;
+  description?: string;
 }
 
 export function EmptyState({ title, description }: EmptyStateProps) {

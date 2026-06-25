@@ -20,13 +20,14 @@ func Serve(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := r.Context()
 	userID := r.URL.Query().Get("user_id")
 	if userID == "" {
 		_ = conn.Close()
 		return
 	}
 
-	user, err := hub.repo.GetUserByID(userID)
+	user, err := hub.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		_ = conn.Close()
 		return
@@ -39,11 +40,11 @@ func Serve(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		userID:   userID,
 		nickname: user.DisplayName,
 		userInfo: &UserInfo{
-			UserID:    user.ID,
-			Username:  user.Username,
+			UserID:    user.ID.Hex(),
+			Phone:     user.PhoneNumber,
 			AvatarURL: user.AvatarURL,
 			IsActive:  true,
-			LastSeen:  time.Now(),
+			LastSeen:  time.Now().UTC(),
 		},
 	}
 
@@ -65,7 +66,7 @@ func Serve(hub *Hub, w http.ResponseWriter, r *http.Request) {
 		client.nickname = user.DisplayName
 	}
 
-	room, err := hub.repo.GetRoom(client.roomID)
+	room, err := hub.repo.GetRoom(ctx, client.roomID)
 	if err != nil {
 		_ = conn.WriteJSON(Message{Type: "error", Text: "Room not found"})
 		_ = conn.Close()
@@ -77,11 +78,11 @@ func Serve(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	room.CurrentTime = 0
 	room.IsPaused = false
 	room.Duration = 0
-	_ = hub.repo.UpdateRoomPlayback(room)
+	_ = hub.repo.UpdateRoomPlayback(ctx, room)
 
-	_ = hub.repo.RecordWatchHistory(userID, room.ID, room.Name, room.VideoPath)
+	_ = hub.repo.RecordWatchHistory(ctx, userID, room.ID.Hex(), room.Title, room.VideoURL)
 	hub.register <- client
-	hub.BroadcastRoomState(room.ID)
+	hub.BroadcastRoomState(room.ID.Hex())
 
 	go client.writePump()
 	go client.readPump()

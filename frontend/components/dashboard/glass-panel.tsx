@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 interface GlassPanelProps {
   title: string;
-  description: string;
+  description?: string;
   className?: string;
   children?: ReactNode;
 }

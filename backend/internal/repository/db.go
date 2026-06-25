@@ -1,150 +1,106 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
+	"fmt"
 	"log"
 	"strings"
+	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+)
+
+const (
+	collUsers           = "users"
+	collOTPs            = "otps"
+	collRooms           = "rooms"
+	collVideos          = "videos"
+	collMessages        = "messages"
+	collInvitations     = "invitations"
+	collFriendships     = "friendships"
+	collWatchHistory    = "watch_history"
+	collScheduledVideos = "scheduled_videos"
+	collTransactions    = "transactions"
+	collPlans           = "plans"
+	collReports         = "reports"
+	collNotifications   = "notifications"
+	collTickets         = "tickets"
+	collTicketMsgs      = "ticket_messages"
+	collSettings        = "settings"
+	collDiscounts       = "discount_codes"
+	collAuditLogs       = "audit_logs"
 )
 
 type Repository struct {
-	db *sql.DB
+	client *mongo.Client
+	db     *mongo.Database
 }
 
-func New(dbPath string) (*Repository, error) {
-	db, err := sql.Open("sqlite3", dbPath)
+func New(ctx context.Context, uri, dbName string) (*Repository, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	if err != nil {
+		return nil, fmt.Errorf("connect mongo: %w", err)
+	}
+	if err := client.Ping(ctx, nil); err != nil {
+		return nil, fmt.Errorf("ping mongo: %w", err)
+	}
+
+	r := &Repository{client: client, db: client.Database(dbName)}
+	if err := r.ensureIndexes(ctx); err != nil {
 		return nil, err
 	}
-	r := &Repository{db: db}
-	if err := r.migrate(); err != nil {
-		return nil, err
-	}
+	log.Printf("Connected to MongoDB database %q", dbName)
 	return r, nil
 }
 
-func (r *Repository) Close() error {
-	return r.db.Close()
+func (r *Repository) Close(ctx context.Context) error {
+	return r.client.Disconnect(ctx)
 }
 
-func (r *Repository) DB() *sql.DB {
-	return r.db
+func (r *Repository) coll(name string) *mongo.Collection {
+	return r.db.Collection(name)
 }
 
-func (r *Repository) migrate() error {
-	schema := []string{
-		`CREATE TABLE IF NOT EXISTS users (
-			id TEXT PRIMARY KEY,
-			username TEXT UNIQUE NOT NULL,
-			password_hash TEXT NOT NULL,
-			display_name TEXT,
-			email TEXT,
-			family_name TEXT,
-			birthday DATE,
-			gender TEXT,
-			phone TEXT,
-			country TEXT,
-			city TEXT,
-			bio TEXT,
-			avatar_url TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS rooms (
-			id TEXT PRIMARY KEY,
-			name TEXT NOT NULL,
-			video_path TEXT,
-			owner_id TEXT NOT NULL,
-			visibility TEXT NOT NULL DEFAULT 'public',
-			background TEXT NOT NULL DEFAULT 'default',
-			is_playing INTEGER NOT NULL DEFAULT 0,
-			current_time REAL NOT NULL DEFAULT 0,
-			is_paused INTEGER NOT NULL DEFAULT 0,
-			duration REAL NOT NULL DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`ALTER TABLE rooms ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'`,
-		`ALTER TABLE rooms ADD COLUMN is_playing INTEGER NOT NULL DEFAULT 0`,
-		`ALTER TABLE rooms ADD COLUMN current_time REAL NOT NULL DEFAULT 0`,
-		`ALTER TABLE rooms ADD COLUMN is_paused INTEGER NOT NULL DEFAULT 0`,
-		`ALTER TABLE rooms ADD COLUMN duration REAL NOT NULL DEFAULT 0`,
-		`ALTER TABLE rooms ADD COLUMN background TEXT NOT NULL DEFAULT 'default'`,
-		`ALTER TABLE users ADD COLUMN email TEXT`,
-		`ALTER TABLE users ADD COLUMN family_name TEXT`,
-		`ALTER TABLE users ADD COLUMN birthday DATE`,
-		`ALTER TABLE users ADD COLUMN gender TEXT`,
-		`ALTER TABLE users ADD COLUMN phone TEXT`,
-		`ALTER TABLE users ADD COLUMN country TEXT`,
-		`ALTER TABLE users ADD COLUMN city TEXT`,
-		`ALTER TABLE users ADD COLUMN bio TEXT`,
-		`CREATE TABLE IF NOT EXISTS messages (
-			id TEXT PRIMARY KEY,
-			room_id TEXT NOT NULL,
-			sender_id TEXT NOT NULL,
-			sender_name TEXT NOT NULL,
-			content TEXT NOT NULL,
-			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-			FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`CREATE TABLE IF NOT EXISTS invitations (
-			id TEXT PRIMARY KEY,
-			room_id TEXT NOT NULL,
-			code TEXT UNIQUE NOT NULL,
-			expires_at DATETIME NOT NULL,
-			max_uses INTEGER DEFAULT 1,
-			used_count INTEGER DEFAULT 0,
-			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
-		)`,
-		`CREATE TABLE IF NOT EXISTS friendships (
-			id TEXT PRIMARY KEY,
-			from_user_id TEXT NOT NULL,
-			to_user_id TEXT NOT NULL,
-			status TEXT NOT NULL DEFAULT 'pending',
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (from_user_id) REFERENCES users(id) ON DELETE CASCADE,
-			FOREIGN KEY (to_user_id) REFERENCES users(id) ON DELETE CASCADE,
-			UNIQUE(from_user_id, to_user_id)
-		)`,
-		`CREATE TABLE IF NOT EXISTS watch_history (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL,
-			room_id TEXT NOT NULL,
-			room_name TEXT NOT NULL,
-			video_path TEXT,
-			watched_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			duration INTEGER DEFAULT 0,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
-		)`,
-		`CREATE TABLE IF NOT EXISTS scheduled_videos (
-			id TEXT PRIMARY KEY,
-			room_id TEXT NOT NULL,
-			title TEXT NOT NULL,
-			description TEXT,
-			video_url TEXT NOT NULL,
-			scheduled_for DATETIME NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			created_by TEXT NOT NULL,
-			is_played INTEGER NOT NULL DEFAULT 0,
-			FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
-			FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
-		)`,
-		`CREATE TABLE IF NOT EXISTS sessions (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			last_active DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-		)`,
+func isIndexConflict(err error) bool {
+	if err == nil {
+		return false
 	}
+	msg := err.Error()
+	return strings.Contains(msg, "IndexKeySpecsConflict") ||
+		strings.Contains(msg, "already exists with a different name")
+}
 
-	for _, stmt := range schema {
-		if _, err := r.db.Exec(stmt); err != nil {
-			if !strings.Contains(err.Error(), "duplicate column name") {
-				log.Println("Schema warning:", err)
-			}
+func (r *Repository) ensureIndexes(ctx context.Context) error {
+	type idx struct {
+		collection string
+		model      mongo.IndexModel
+	}
+	indexes := []idx{
+		{collUsers, mongo.IndexModel{Keys: bson.D{{Key: "phone_number", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_phone_number")}},
+		{collOTPs, mongo.IndexModel{Keys: bson.D{{Key: "phone_number", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_otp_phone")}},
+		{collOTPs, mongo.IndexModel{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0).SetName("ttl_otp_expires")}},
+		{collVideos, mongo.IndexModel{Keys: bson.D{{Key: "uploader_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_video_uploader")}},
+		{collRooms, mongo.IndexModel{Keys: bson.D{{Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_room_slug")}},
+		{collInvitations, mongo.IndexModel{Keys: bson.D{{Key: "code", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_invite_code")}},
+		{collFriendships, mongo.IndexModel{Keys: bson.D{{Key: "from_user_id", Value: 1}, {Key: "to_user_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_friendship")}},
+		{collWatchHistory, mongo.IndexModel{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "watched_at", Value: -1}}, Options: options.Index().SetName("idx_watch_user")}},
+		{collTransactions, mongo.IndexModel{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_tx_user")}},
+		{collPlans, mongo.IndexModel{Keys: bson.D{{Key: "slug", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_plan_slug")}},
+		{collReports, mongo.IndexModel{Keys: bson.D{{Key: "status", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_report_status")}},
+		{collNotifications, mongo.IndexModel{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_notif_user")}},
+		{collTickets, mongo.IndexModel{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_ticket_user")}},
+		{collTicketMsgs, mongo.IndexModel{Keys: bson.D{{Key: "ticket_id", Value: 1}, {Key: "created_at", Value: 1}}, Options: options.Index().SetName("idx_ticket_msg")}},
+		{collDiscounts, mongo.IndexModel{Keys: bson.D{{Key: "code", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_discount_code")}},
+		{collAuditLogs, mongo.IndexModel{Keys: bson.D{{Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_audit_created")}},
+	}
+	for _, i := range indexes {
+		if _, err := r.coll(i.collection).Indexes().CreateOne(ctx, i.model); err != nil && !isIndexConflict(err) {
+			return fmt.Errorf("create index on %s: %w", i.collection, err)
 		}
 	}
 	return nil

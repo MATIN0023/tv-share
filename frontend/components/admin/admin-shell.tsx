@@ -15,15 +15,21 @@ import {
   LogOut,
   ArrowRight,
   Server,
+  Tag,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLogout } from "@/hooks/use-auth";
+import { useAdminSettings } from "@/hooks/use-admin";
 
 const adminNav = [
   { href: "/admin", label: "داشبورد", icon: LayoutDashboard, exact: true },
   { href: "/admin/users", label: "کاربران", icon: Users },
-  { href: "/admin/plans", label: "پلن‌ها و تراکنش‌ها", icon: CreditCard },
-  { href: "/admin/reports", label: "گزارش‌ها و تخلفات", icon: ShieldAlert },
+  { href: "/admin/plans", label: "پلن‌ها و فاکتورها", icon: CreditCard },
+  { href: "/admin/coupons", label: "کدهای تخفیف", icon: Tag },
+  { href: "/admin/reports", label: "گزارش‌ها", icon: ShieldAlert },
   { href: "/admin/rooms", label: "اتاق‌ها و محتوا", icon: DoorOpen },
+  { href: "/admin/logs", label: "لاگ فعالیت", icon: ScrollText },
   { href: "/admin/settings", label: "تنظیمات سیستم", icon: Settings },
 ];
 
@@ -34,6 +40,9 @@ interface AdminShellProps {
 export function AdminShell({ children }: AdminShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const logout = useLogout();
+  const settingsQ = useAdminSettings();
+  const maintenance = settingsQ.data?.maintenance_mode;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -46,10 +55,10 @@ export function AdminShell({ children }: AdminShellProps) {
         >
           <div className="mb-6 border-b border-zinc-800 pb-4">
             <p className="text-xs font-medium uppercase tracking-wider text-amber-500">
-              Admin Panel
+              پنل مدیریت
             </p>
             <h1 className="mt-1 text-lg font-bold">MovieSync</h1>
-            <p className="text-xs text-zinc-500">مدیریت سیستم</p>
+            <p className="text-xs text-zinc-500">مدیریت کل سیستم</p>
           </div>
 
           <nav className="flex-1 space-y-1 overflow-y-auto">
@@ -88,6 +97,7 @@ export function AdminShell({ children }: AdminShellProps) {
             </Link>
             <button
               type="button"
+              onClick={logout}
               className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-400"
             >
               <LogOut className="size-4" />
@@ -106,13 +116,17 @@ export function AdminShell({ children }: AdminShellProps) {
             >
               <Menu className="size-5" />
             </button>
-            <div className="flex items-center gap-2 text-sm text-zinc-500">
-              <Server className="size-4 text-emerald-500" />
-              <span>وضعیت سرویس: پایدار</span>
+            <div className="flex items-center gap-2 text-sm">
+              <Server
+                className={`size-4 ${maintenance ? "text-amber-500" : "text-emerald-500"}`}
+              />
+              <span className="text-zinc-500">
+                {maintenance ? "حالت تعمیرات فعال" : "سرویس در دسترس"}
+              </span>
             </div>
             <button
               type="button"
-              className="hidden rounded-lg p-2 md:block md:hidden"
+              className="rounded-lg p-2 md:hidden"
               onClick={() => setMenuOpen(false)}
             >
               <X className="size-5" />

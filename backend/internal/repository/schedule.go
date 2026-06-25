@@ -1,54 +1,64 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"watch-party/internal/models"
 )
 
-func (r *Repository) CreateScheduledVideo(id, roomID, createdBy, title, description, videoURL string, scheduledFor time.Time) error {
-	_, err := r.db.Exec(`
-		INSERT INTO scheduled_videos (id, room_id, title, description, video_url, scheduled_for, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, id, roomID, title, description, videoURL, scheduledFor, createdBy)
-	return err
-}
-
-func (r *Repository) GetScheduledVideos(createdBy, status string) ([]models.ScheduledVideo, error) {
-	var rows *sql.Rows
-	var err error
-
-	if status == "" || status == "all" {
-		rows, err = r.db.Query(`
-			SELECT id, room_id, title, description, video_url, scheduled_for, created_at, created_by, is_played
-			FROM scheduled_videos
-			WHERE created_by = ?
-			ORDER BY scheduled_for ASC
-		`, createdBy)
-	} else {
-		played := status == "played"
-		rows, err = r.db.Query(`
-			SELECT id, room_id, title, description, video_url, scheduled_for, created_at, created_by, is_played
-			FROM scheduled_videos
-			WHERE created_by = ? AND is_played = ?
-			ORDER BY scheduled_for ASC
-		`, createdBy, played)
-	}
+func (r *Repository) CreateScheduledVideo(ctx context.Context, roomID, createdBy, title, description, videoURL string, scheduledFor time.Time) (*models.ScheduledVideo, error) {
+	roomOID, err := parseObjectID(roomID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	creatorOID, err := parseObjectID(createdBy)
+	if err != nil {
+		return nil, err
+	}
+	now := models.NowUTC()
+	sv := models.ScheduledVideo{
+		ID:           primitive.NewObjectID(),
+		RoomID:       roomOID,
+		Title:        title,
+		Description:  description,
+		VideoURL:     videoURL,
+		ScheduledFor: scheduledFor.UTC(),
+		CreatedBy:    creatorOID,
+		IsPlayed:     false,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	_, err = r.coll(collScheduledVideos).InsertOne(ctx, sv)
+	if err != nil {
+		return nil, err
+	}
+	return &sv, nil
+}
+
+func (r *Repository) GetScheduledVideos(ctx context.Context, createdBy, status string) ([]models.ScheduledVideo, error) {
+	creatorOID, err := parseObjectID(createdBy)
+	if err != nil {
+		return nil, err
+	}
+	filter := bson.M{"created_by": creatorOID}
+	if status == "played" {
+		filter["is_played"] = true
+	} else if status == "pending" {
+		filter["is_played"] = false
+	}
+	cur, err := r.coll(collScheduledVideos).Find(ctx, filter, optionsFindAsc("scheduled_for"))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
 
 	var videos []models.ScheduledVideo
-	for rows.Next() {
-		var v models.ScheduledVideo
-		var isPlayed int
-		if err := rows.Scan(&v.ID, &v.RoomID, &v.Title, &v.Description, &v.VideoURL, &v.ScheduledFor, &v.CreatedAt, &v.CreatedBy, &isPlayed); err != nil {
-			return nil, err
-		}
-		v.IsPlayed = isPlayed == 1
-		videos = append(videos, v)
+	if err := cur.All(ctx, &videos); err != nil {
+		return nil, err
 	}
 	if videos == nil {
 		videos = []models.ScheduledVideo{}
@@ -56,12 +66,23 @@ func (r *Repository) GetScheduledVideos(createdBy, status string) ([]models.Sche
 	return videos, nil
 }
 
-func (r *Repository) CompleteScheduledVideo(id string) error {
-	_, err := r.db.Exec(`UPDATE scheduled_videos SET is_played = 1 WHERE id = ?`, id)
+func (r *Repository) CompleteScheduledVideo(ctx context.Context, id string) error {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll(collScheduledVideos).UpdateByID(ctx, oid, bson.M{"$set": bson.M{
+		"is_played":  true,
+		"updated_at": models.NowUTC(),
+	}})
 	return err
 }
 
-func (r *Repository) DeleteScheduledVideo(id string) error {
-	_, err := r.db.Exec(`DELETE FROM scheduled_videos WHERE id = ?`, id)
+func (r *Repository) DeleteScheduledVideo(ctx context.Context, id string) error {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll(collScheduledVideos).DeleteOne(ctx, bson.M{"_id": oid})
 	return err
 }

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"watch-party/internal/util"
 )
 
 type scheduleVideoRequest struct {
@@ -43,19 +42,18 @@ func (h *Handler) CreateScheduledVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.Repo.GetRoom(req.RoomID); err != nil {
+	if _, err := h.Repo.GetRoom(r.Context(), req.RoomID); err != nil {
 		WriteJSONError(w, http.StatusNotFound, "Room not found")
 		return
 	}
 
-	id := util.GenerateID()
-	uid := userID(r)
-	if err := h.Repo.CreateScheduledVideo(id, req.RoomID, uid, req.Title, req.Description, req.VideoURL, scheduledFor); err != nil {
+	sv, err := h.Repo.CreateScheduledVideo(r.Context(), req.RoomID, userID(r), req.Title, req.Description, req.VideoURL, scheduledFor)
+	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to schedule video")
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]string{
-		"id":           id,
+		"id":           sv.ID.Hex(),
 		"scheduled_at": req.ScheduledAt,
 	})
 }
@@ -70,7 +68,7 @@ func (h *Handler) CreateScheduledVideo(w http.ResponseWriter, r *http.Request) {
 // @Router /api/schedule [get]
 func (h *Handler) ListScheduledVideos(w http.ResponseWriter, r *http.Request) {
 	status := r.URL.Query().Get("status")
-	scheduled, err := h.Repo.GetScheduledVideos(userID(r), status)
+	scheduled, err := h.Repo.GetScheduledVideos(r.Context(), userID(r), status)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to get scheduled videos")
 		return
@@ -87,7 +85,7 @@ func (h *Handler) ListScheduledVideos(w http.ResponseWriter, r *http.Request) {
 // @Router /api/schedule/{id}/complete [post]
 func (h *Handler) CompleteScheduledVideo(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if err := h.Repo.CompleteScheduledVideo(id); err != nil {
+	if err := h.Repo.CompleteScheduledVideo(r.Context(), id); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to complete")
 		return
 	}
@@ -103,7 +101,7 @@ func (h *Handler) CompleteScheduledVideo(w http.ResponseWriter, r *http.Request)
 // @Router /api/schedule/{id} [delete]
 func (h *Handler) DeleteScheduledVideo(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
-	if err := h.Repo.DeleteScheduledVideo(id); err != nil {
+	if err := h.Repo.DeleteScheduledVideo(r.Context(), id); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to delete")
 		return
 	}

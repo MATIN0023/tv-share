@@ -9,8 +9,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"watch-party/internal/auth"
 	"watch-party/internal/config"
@@ -22,24 +27,42 @@ import (
 
 func main() {
 	cfg := config.Load()
+	ctx := context.Background()
 
-	repo, err := repository.New(cfg.DBPath)
+	repo, err := repository.New(ctx, cfg.MongoURI, cfg.MongoDB)
 	if err != nil {
-		log.Fatal("Failed to open database:", err)
+		log.Fatal("Failed to connect to MongoDB:", err)
 	}
-	defer repo.Close()
 
-	if err := repo.EnsureDefaultUser(); err != nil {
+	if err := repo.EnsureDefaultUser(ctx); err != nil {
 		log.Printf("Default user setup: %v", err)
+	}
+	if err := repo.EnsureDefaultPlans(ctx); err != nil {
+		log.Printf("Default plans setup: %v", err)
 	}
 
 	jwtAuth := auth.NewJWT(cfg.JWTSecret)
+	authHandler := auth.NewHandler(repo, jwtAuth)
 	hub := ws.NewHub(repo)
 	go hub.Run()
 
 	h := handlers.New(repo, hub, jwtAuth)
-	router := routes.New(h, hub, jwtAuth)
+	router := routes.New(h, authHandler, hub, jwtAuth, repo)
 
-	log.Printf("API server listening on %s", cfg.Addr)
-	log.Fatal(http.ListenAndServe(cfg.Addr, router))
+	srv := &http.Server{Addr: cfg.Addr, Handler: router}
+	go func() {
+		log.Printf("API server listening on %s (MongoDB: %s)", cfg.Addr, cfg.MongoDB)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = srv.Shutdown(shutdownCtx)
+	_ = repo.Close(shutdownCtx)
 }

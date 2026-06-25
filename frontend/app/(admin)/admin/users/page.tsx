@@ -1,61 +1,114 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState, Suspense, useEffect, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
 import { AdminPanel } from "@/components/admin/admin-panel";
-import { SearchField } from "@/components/forms/search-field";
-import { ConfirmActionModal } from "@/components/dashboard/modals/confirm-action-modal";
+import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
+import { PaginationBar } from "@/components/admin/pagination-bar";
+import { DebouncedSearchField } from "@/components/forms/debounced-search-field";
+import { LabeledField } from "@/components/admin/labeled-field";
 import { Input } from "@/components/ui/input";
-import { UserPlus, Ban, Pencil, Gift } from "lucide-react";
+import { UserPlus, Pencil, Ban, Trash2, KeyRound } from "lucide-react";
+import {
+  useAdminUsers,
+  useBanAdminUser,
+  useCreateAdminUser,
+  useDeleteAdminUser,
+  useResetAdminUserPassword,
+  useUpdateAdminUser,
+} from "@/hooks/use-admin";
+import {
+  adminCreateUserSchema,
+  adminEditUserSchema,
+  type AdminCreateUserForm,
+  type AdminEditUserForm,
+} from "@/lib/validations/admin";
+import { formatFaDate } from "@/lib/utils/format-date";
+import type { UserProfile } from "@/lib/api/types";
 
-type UserRow = {
-  id: string;
-  name: string;
-  phone: string;
-  role: "user" | "admin";
-  plan: string;
-  status: "فعال" | "محدود";
-};
+const PAGE_SIZE = 15;
 
-const initialUsers: UserRow[] = [
-  { id: "u1", name: "علی رضایی", phone: "09123456789", role: "user", plan: "طلایی", status: "فعال" },
-  { id: "u2", name: "مهدی موسوی", phone: "09121112222", role: "user", plan: "پایه", status: "فعال" },
-  { id: "u3", name: "مدیر سیستم", phone: "09120000000", role: "admin", plan: "—", status: "فعال" },
-  { id: "u4", name: "کاربر مشکوک", phone: "09309998877", role: "user", plan: "پایه", status: "محدود" },
-];
+function UsersPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const page = Number(searchParams.get("page") || "1");
+  const search = searchParams.get("search") || "";
+  const [searchDraft, setSearchDraft] = useState(search);
 
-export default function AdminUsersPage() {
-  const [users, setUsers] = useState(initialUsers);
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [banOpen, setBanOpen] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [newUser, setNewUser] = useState({ name: "", phone: "", plan: "پایه" });
+  useEffect(() => {
+    setSearchDraft(search);
+  }, [search]);
 
-  const pageSize = 10;
-  const filtered = useMemo(
-    () =>
-      users.filter(
-        (u) =>
-          u.name.includes(search) ||
-          u.phone.includes(search) ||
-          u.id.includes(search)
-      ),
-    [users, search]
+  const applySearch = useCallback(
+    (value: string) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (value.trim()) params.set("search", value.trim());
+      else params.delete("search");
+      params.set("page", "1");
+      router.replace(`/admin/users?${params.toString()}`);
+    },
+    [router, searchParams]
   );
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const usersQ = useAdminUsers({ page, limit: PAGE_SIZE, search: search || undefined });
+  const createMut = useCreateAdminUser();
+  const updateMut = useUpdateAdminUser();
+  const banMut = useBanAdminUser();
+  const deleteMut = useDeleteAdminUser();
+  const resetMut = useResetAdminUserPassword();
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editUser, setEditUser] = useState<UserProfile | null>(null);
+  const [banUser, setBanUser] = useState<UserProfile | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [resetId, setResetId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+
+  const createForm = useForm<AdminCreateUserForm>({
+    resolver: zodResolver(adminCreateUserSchema),
+    defaultValues: {
+      display_name: "",
+      phone_number: "",
+      password: "",
+      role: "user",
+      subscription_plan: "free",
+    },
+  });
+
+  const editForm = useForm<AdminEditUserForm>({
+    resolver: zodResolver(adminEditUserSchema),
+  });
+
+  const rows = usersQ.data?.items ?? [];
+  const total = usersQ.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const statusBadge = (u: UserProfile) =>
+    u.is_active === false ? (
+      <span className="text-red-400">مسدود</span>
+    ) : (
+      <span className="text-emerald-400">فعال</span>
+    );
 
   return (
     <div>
       <AdminSectionHeader
         title="مدیریت کاربران"
-        description="جستجو، CRUD، تغییر نقش، بن و تخصیص پلن."
+        description={
+          usersQ.isLoading
+            ? "در حال بارگذاری..."
+            : `نمایش ${rows.length} از ${total} کاربر`
+        }
         action={
           <button
             type="button"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => {
+              createForm.reset();
+              setCreateOpen(true);
+            }}
             className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-zinc-950"
           >
             <UserPlus className="size-4" />
@@ -64,168 +117,281 @@ export default function AdminUsersPage() {
         }
       />
 
+      {usersQ.isError ? (
+        <p className="mb-4 text-red-400">
+          خطا در بارگذاری کاربران —{" "}
+          <button type="button" className="underline" onClick={() => usersQ.refetch()}>
+            تلاش مجدد
+          </button>
+        </p>
+      ) : null}
+
       <AdminPanel>
         <div className="mb-4">
-          <SearchField
-            placeholder="جستجو نام، موبایل، شناسه..."
-            value={search}
-            onChange={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
+          <DebouncedSearchField
+            placeholder="جستجو: نام، موبایل، نقش یا شناسه کاربر..."
+            value={searchDraft}
+            onDebouncedChange={applySearch}
           />
         </div>
 
         <div className="overflow-x-auto rounded-lg border border-zinc-800">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-zinc-800/50 text-zinc-500">
+          <table className="w-full min-w-[960px] text-sm">
+            <thead className="bg-zinc-900 text-zinc-500">
               <tr>
+                <th className="px-3 py-2 text-right">شناسه</th>
                 <th className="px-3 py-2 text-right">نام</th>
                 <th className="px-3 py-2 text-right">موبایل</th>
                 <th className="px-3 py-2 text-right">نقش</th>
                 <th className="px-3 py-2 text-right">پلن</th>
                 <th className="px-3 py-2 text-right">وضعیت</th>
+                <th className="px-3 py-2 text-right">تاریخ عضویت</th>
                 <th className="px-3 py-2 text-right">عملیات</th>
               </tr>
             </thead>
             <tbody>
-              {pageRows.map((user) => (
-                <tr key={user.id} className="border-t border-zinc-800">
-                  <td className="px-3 py-2">{user.name}</td>
-                  <td className="px-3 py-2" dir="ltr">
-                    {user.phone}
-                  </td>
-                  <td className="px-3 py-2">{user.role === "admin" ? "ادمین" : "کاربر"}</td>
-                  <td className="px-3 py-2">{user.plan}</td>
-                  <td className="px-3 py-2">{user.status}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" className="text-xs text-zinc-400 hover:text-amber-400">
-                        <Pencil className="inline size-3" /> ویرایش
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setUsers((prev) =>
-                            prev.map((u) =>
-                              u.id === user.id ? { ...u, plan: "طلایی (هدیه)" } : u
-                            )
-                          )
-                        }
-                        className="text-xs text-emerald-500"
-                      >
-                        <Gift className="inline size-3" /> هدیه پلن
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedId(user.id);
-                          setBanOpen(true);
-                        }}
-                        className="text-xs text-red-400"
-                      >
-                        <Ban className="inline size-3" /> بن
-                      </button>
-                    </div>
+              {usersQ.isLoading ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-zinc-500">
+                    در حال بارگذاری...
                   </td>
                 </tr>
-              ))}
+              ) : rows.length ? (
+                rows.map((u) => (
+                  <tr key={u.id} className="border-t border-zinc-800">
+                    <td className="px-3 py-2 font-mono text-xs text-zinc-500" dir="ltr">
+                      {u.id.slice(-8)}
+                    </td>
+                    <td className="px-3 py-2">{u.display_name ?? "—"}</td>
+                    <td className="px-3 py-2" dir="ltr">
+                      {u.phone_number}
+                    </td>
+                    <td className="px-3 py-2">{u.role}</td>
+                    <td className="px-3 py-2">{u.subscription_plan ?? "free"}</td>
+                    <td className="px-3 py-2">{statusBadge(u)}</td>
+                    <td className="px-3 py-2 text-xs text-zinc-500">
+                      {formatFaDate(u.created_at)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          title="ویرایش"
+                          onClick={() => {
+                            setEditUser(u);
+                            editForm.reset({
+                              display_name: u.display_name ?? "",
+                              phone_number: u.phone_number,
+                              role: (u.role as AdminEditUserForm["role"]) ?? "user",
+                              subscription_plan:
+                                (u.subscription_plan as AdminEditUserForm["subscription_plan"]) ??
+                                "free",
+                              is_active: u.is_active !== false,
+                            });
+                          }}
+                          className="text-amber-400"
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title="مسدود / آزاد"
+                          onClick={() => setBanUser(u)}
+                          className="text-orange-400"
+                        >
+                          <Ban className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title="تغییر رمز"
+                          onClick={() => {
+                            setResetId(u.id);
+                            setNewPassword("");
+                          }}
+                          className="text-sky-400"
+                        >
+                          <KeyRound className="size-4" />
+                        </button>
+                        <button
+                          type="button"
+                          title="حذف"
+                          onClick={() => setDeleteId(u.id)}
+                          className="text-red-400"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={8} className="px-3 py-6 text-center text-zinc-500">
+                    کاربری یافت نشد
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
-        <div className="mt-4 flex items-center justify-between text-sm text-zinc-500">
-          <span>
-            صفحه {page} از {totalPages} — {filtered.length} کاربر
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
-              className="rounded border border-zinc-700 px-2 py-1 disabled:opacity-40"
-            >
-              قبلی
-            </button>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded border border-zinc-700 px-2 py-1 disabled:opacity-40"
-            >
-              بعدی
-            </button>
-          </div>
-        </div>
+        <PaginationBar page={page} totalPages={totalPages} total={total} />
       </AdminPanel>
 
-      {createOpen ? (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-900 p-5">
-            <h3 className="font-semibold">افزودن کاربر</h3>
-            <div className="mt-4 space-y-3">
-              <Input
-                placeholder="نام"
-                value={newUser.name}
-                onChange={(e) => setNewUser((s) => ({ ...s, name: e.target.value }))}
-              />
-              <Input
-                placeholder="09123456789"
-                dir="ltr"
-                value={newUser.phone}
-                onChange={(e) => setNewUser((s) => ({ ...s, phone: e.target.value }))}
-              />
-              <select
-                value={newUser.plan}
-                onChange={(e) => setNewUser((s) => ({ ...s, plan: e.target.value }))}
-                className="h-8 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm"
-              >
-                <option>پایه</option>
-                <option>نقره‌ای</option>
-                <option>طلایی</option>
-              </select>
-            </div>
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => setCreateOpen(false)}
-                className="flex-1 rounded-lg border border-zinc-700 py-2 text-sm"
-              >
-                انصراف
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUsers((prev) => [
-                    {
-                      id: `u${prev.length + 1}`,
-                      name: newUser.name,
-                      phone: newUser.phone,
-                      role: "user",
-                      plan: newUser.plan,
-                      status: "فعال",
-                    },
-                    ...prev,
-                  ]);
-                  setCreateOpen(false);
-                  setNewUser({ name: "", phone: "", plan: "پایه" });
-                }}
-                className="flex-1 rounded-lg bg-amber-500 py-2 text-sm text-zinc-950"
-              >
-                ذخیره
-              </button>
-            </div>
-          </div>
+      <AdminConfirmDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="ایجاد کاربر جدید"
+        description="اطلاعات کاربر را با دقت وارد کنید"
+        confirmLabel="ایجاد کاربر"
+        onConfirm={createForm.handleSubmit(async (data) => {
+          await createMut.mutateAsync({
+            phone_number: data.phone_number,
+            password: data.password,
+            display_name: data.display_name,
+            role: data.role,
+            subscription_plan: data.subscription_plan,
+          });
+        })}
+      >
+        <div className="space-y-3 text-sm">
+          <LabeledField
+            label="نام نمایشی"
+            error={createForm.formState.errors.display_name?.message}
+          >
+            <Input className="border-zinc-700 bg-zinc-950" {...createForm.register("display_name")} />
+          </LabeledField>
+          <LabeledField
+            label="شماره موبایل"
+            hint="فرمت: 09123456789"
+            error={createForm.formState.errors.phone_number?.message}
+          >
+            <Input dir="ltr" className="border-zinc-700 bg-zinc-950" {...createForm.register("phone_number")} />
+          </LabeledField>
+          <LabeledField
+            label="رمز عبور"
+            hint="حداقل ۸ کاراکتر با حروف بزرگ، کوچک و عدد"
+            error={createForm.formState.errors.password?.message}
+          >
+            <Input type="password" className="border-zinc-700 bg-zinc-950" {...createForm.register("password")} />
+          </LabeledField>
+          <LabeledField label="نقش کاربر">
+            <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...createForm.register("role")}>
+              <option value="user">کاربر عادی</option>
+              <option value="admin">مدیر</option>
+              <option value="superadmin">مدیر ارشد</option>
+            </select>
+          </LabeledField>
+          <LabeledField label="پلن اشتراک اولیه">
+            <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...createForm.register("subscription_plan")}>
+              <option value="free">رایگان</option>
+              <option value="premium">پریمیوم</option>
+            </select>
+          </LabeledField>
         </div>
-      ) : null}
+      </AdminConfirmDialog>
 
-      <ConfirmActionModal
-        open={banOpen}
-        onClose={() => setBanOpen(false)}
-        title="مسدودسازی کاربر"
-        description="کاربر انتخاب‌شده محدود می‌شود و دسترسی به اتاق‌ها قطع خواهد شد."
-        confirmLabel="تایید بن"
+      <AdminConfirmDialog
+        open={!!editUser}
+        onClose={() => setEditUser(null)}
+        title="ویرایش کاربر"
+        confirmLabel="ذخیره تغییرات"
+        onConfirm={editForm.handleSubmit(async (data) => {
+          if (!editUser) return;
+          await updateMut.mutateAsync({
+            id: editUser.id,
+            body: data,
+          });
+        })}
+      >
+        <div className="space-y-3 text-sm">
+          <LabeledField
+            label="نام نمایشی"
+            error={editForm.formState.errors.display_name?.message}
+          >
+            <Input className="border-zinc-700 bg-zinc-950" {...editForm.register("display_name")} />
+          </LabeledField>
+          <LabeledField
+            label="شماره موبایل"
+            error={editForm.formState.errors.phone_number?.message}
+          >
+            <Input dir="ltr" className="border-zinc-700 bg-zinc-950" {...editForm.register("phone_number")} />
+          </LabeledField>
+          <LabeledField label="نقش">
+            <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...editForm.register("role")}>
+              <option value="user">کاربر عادی</option>
+              <option value="admin">مدیر</option>
+              <option value="superadmin">مدیر ارشد</option>
+            </select>
+          </LabeledField>
+          <LabeledField label="پلن اشتراک">
+            <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...editForm.register("subscription_plan")}>
+              <option value="free">رایگان</option>
+              <option value="premium">پریمیوم</option>
+            </select>
+          </LabeledField>
+          <label className="flex items-center gap-2">
+            <input type="checkbox" {...editForm.register("is_active")} />
+            حساب فعال (غیرفعال = مسدود)
+          </label>
+        </div>
+      </AdminConfirmDialog>
+
+      <AdminConfirmDialog
+        open={!!banUser}
+        onClose={() => setBanUser(null)}
+        title={banUser?.is_active === false ? "رفع مسدودیت" : "مسدود کردن کاربر"}
+        description={`کاربر: ${banUser?.display_name ?? banUser?.phone_number}`}
+        variant="danger"
+        confirmLabel={banUser?.is_active === false ? "رفع مسدودیت" : "مسدود کردن"}
+        onConfirm={async () => {
+          if (!banUser) return;
+          await banMut.mutateAsync({
+            id: banUser.id,
+            banned: banUser.is_active !== false,
+          });
+        }}
       />
+
+      <AdminConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        title="حذف کاربر"
+        description="این عملیات غیرقابل بازگشت است."
+        variant="danger"
+        confirmLabel="حذف قطعی"
+        onConfirm={async () => {
+          if (deleteId) await deleteMut.mutateAsync(deleteId);
+        }}
+      />
+
+      <AdminConfirmDialog
+        open={!!resetId}
+        onClose={() => setResetId(null)}
+        title="تغییر رمز عبور"
+        description="رمز جدید حداقل ۸ کاراکتر با حروف بزرگ، کوچک و عدد"
+        confirmLabel="تغییر رمز"
+        onConfirm={async () => {
+          if (resetId && newPassword.length >= 8) {
+            await resetMut.mutateAsync({ id: resetId, password: newPassword });
+          }
+        }}
+      >
+        <Input
+          type="password"
+          placeholder="رمز جدید"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+        />
+      </AdminConfirmDialog>
     </div>
+  );
+}
+
+export default function AdminUsersPage() {
+  return (
+    <Suspense fallback={<p className="text-zinc-500">در حال بارگذاری...</p>}>
+      <UsersPageContent />
+    </Suspense>
   );
 }

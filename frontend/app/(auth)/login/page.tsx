@@ -1,9 +1,8 @@
-// app/login/page.tsx
 "use client";
+
 import React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -24,44 +23,38 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { StatefulButton } from "@/components/ui/stateful-button";
-import { useRouter } from "next/navigation";
-
-const loginSchema = z.object({
-  phone: z
-    .string()
-    .regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)"),
-  password: z
-    .string()
-    .min(8, "رمز عبور باید حداقل ۸ کاراکتر باشد")
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      "رمز عبور باید شامل حروف بزرگ، کوچک و عدد باشد"
-    ),
-});
-
-type LoginFormValues = z.infer<typeof loginSchema>;
+import { useLoginMutation } from "@/hooks/use-auth";
+import { loginSchema, type LoginFormValues } from "@/lib/validations/auth";
+import { ApiError } from "@/lib/api";
 
 export default function LoginPage() {
+  const loginMutation = useLoginMutation();
 
-    const router = useRouter(); // اضافه کردن هوک روتر
-  
-    const form = useForm<LoginFormValues>({
-      resolver: zodResolver(loginSchema),
-      defaultValues: {
-        phone: "09123456789",
-        password: "Admin123", 
-      },
-    });
-  
-    const onSubmit = async (data: LoginFormValues) => {
-      console.log("Login data:", data);
-      
-      // شبیه‌سازی زمان بارگذاری
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      // انتقال کاربر به صفحه داشبورد
-      router.push("/dashboard");
-    };
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      phone: "09123456789",
+      password: "Admin123",
+    },
+  });
+
+  const onSubmit = (data: LoginFormValues) => {
+    loginMutation.mutate(
+      { phone_number: data.phone, password: data.password },
+      {
+        onError: (err) => {
+          form.setError("root", {
+            message:
+              err instanceof ApiError
+                ? err.message
+                : "خطا در ورود. دوباره تلاش کنید.",
+          });
+        },
+      }
+    );
+  };
+
+  const rootError = form.formState.errors.root?.message;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-black dark:to-gray-900 p-4">
@@ -77,15 +70,12 @@ export default function LoginPage() {
               خوش آمدید
             </CardTitle>
             <CardDescription className="text-center text-base">
-              برای ادامه وارد حساب کاربری خود شوید
+              ورود با شماره موبایل و رمز عبور
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4"
-              >
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="phone"
@@ -124,18 +114,21 @@ export default function LoginPage() {
                     </FormItem>
                   )}
                 />
+                {rootError ? (
+                  <p className="text-sm text-red-600 text-center">{rootError}</p>
+                ) : null}
                 <div className="flex items-center justify-between text-sm">
                   <Link
                     href="/forgot-password"
-                    className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300"
+                    className="text-purple-600 hover:text-purple-700 dark:text-purple-400"
                   >
-                    فراموشی رمز عبور؟
+                    فراموشی رمز عبور؟ (ورود با OTP)
                   </Link>
                 </div>
                 <div className="pt-2">
                   <StatefulButton
                     type="submit"
-                    disabled={form.formState.isSubmitting}
+                    disabled={loginMutation.isPending}
                     loadingText="در حال ورود..."
                     successText="ورود موفق!"
                   >
@@ -148,10 +141,7 @@ export default function LoginPage() {
           <CardFooter className="flex flex-col space-y-4">
             <div className="text-sm text-center text-gray-600 dark:text-gray-400">
               حساب کاربری ندارید؟{" "}
-              <Link
-                href="/signup"
-                className="text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 font-semibold"
-              >
+              <Link href="/signup" className="text-purple-600 font-semibold">
                 ثبت‌نام کنید
               </Link>
             </div>

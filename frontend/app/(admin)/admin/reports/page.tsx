@@ -1,102 +1,145 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
 import { AdminPanel } from "@/components/admin/admin-panel";
-import { Ban, MessageSquare, XCircle } from "lucide-react";
+import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
+import { PaginationBar } from "@/components/admin/pagination-bar";
+import { useAdminReports, useResolveAdminReport } from "@/hooks/use-admin";
+import { formatFaDate } from "@/lib/utils/format-date";
 
-const reports = [
-  {
-    id: "r1",
-    room: "Anime Weekend",
-    type: "چت نامناسب",
-    reporter: "الهام",
-    excerpt: "پیام‌های توهین‌آمیز در چت گروهی",
-    date: "۱۴۰۵/۰۳/۰۷",
-    priority: "high",
-  },
-  {
-    id: "r2",
-    room: "Late Night",
-    type: "اسپم لینک",
-    reporter: "سینا",
-    excerpt: "ارسال لینک مشکوک مکرر",
-    date: "۱۴۰۵/۰۳/۰۶",
-    priority: "medium",
-  },
-];
+const TARGET_LABELS: Record<string, string> = {
+  user: "کاربر",
+  room: "اتاق",
+  video: "ویدیو",
+  message: "پیام",
+};
 
-export default function AdminReportsPage() {
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+function ReportsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const page = Number(searchParams.get("page") || "1");
+  const status = searchParams.get("status") || "";
+  const targetType = searchParams.get("target_type") || "";
+
+  const reportsQ = useAdminReports({ page, limit: 15, status, target_type: targetType });
+  const resolveMut = useResolveAdminReport();
+  const [resolveId, setResolveId] = useState<string | null>(null);
+
+  const reports = reportsQ.data?.items ?? [];
+  const total = reportsQ.data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / 15));
+
+  const setFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    params.set("page", "1");
+    router.push(`/admin/reports?${params.toString()}`);
+  };
 
   return (
     <div>
       <AdminSectionHeader
         title="گزارش‌ها و تخلفات"
-        description="بررسی شکایات، چت اتاق‌ها، تعلیق اتاق و بن کاربر."
+        description="بررسی گزارش‌های کاربران و رسیدگی به تخلفات"
       />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="space-y-3 lg:col-span-2">
-          {reports.map((report) => (
-            <AdminPanel key={report.id}>
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="font-medium">{report.room}</p>
-                  <p className="text-sm text-amber-500">{report.type}</p>
-                  <p className="mt-1 text-xs text-zinc-500">
-                    گزارش‌دهنده: {report.reporter} — {report.date}
-                  </p>
-                  <p className="mt-2 text-sm text-zinc-400">{report.excerpt}</p>
-                </div>
-                {report.priority === "high" ? (
-                  <span className="rounded bg-red-950 px-2 py-0.5 text-xs text-red-400">
-                    فوری
-                  </span>
-                ) : null}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedChat(report.id)}
-                  className="inline-flex items-center gap-1 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs"
-                >
-                  <MessageSquare className="size-3" />
-                  بررسی چت
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-400"
-                >
-                  <XCircle className="size-3" />
-                  بستن اتاق
-                </button>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-900/50 px-3 py-1.5 text-xs text-red-400"
-                >
-                  <Ban className="size-3" />
-                  بن کاربر
-                </button>
-              </div>
-            </AdminPanel>
-          ))}
-        </div>
-
-        <AdminPanel title="پیش‌نمایش چت">
-          {selectedChat ? (
-            <div className="space-y-2 text-sm">
-              <p className="text-zinc-500">اتاق: {reports.find((r) => r.id === selectedChat)?.room}</p>
-              <div className="rounded-lg bg-zinc-950 p-3">
-                <p className="text-red-300">[کاربر۱]: ...</p>
-                <p className="mt-2 text-zinc-400">[سیستم]: گزارش ثبت شد</p>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500">یک گزارش را انتخاب کنید تا چت نمایش داده شود.</p>
-          )}
-        </AdminPanel>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {["", "open", "resolved"].map((s) => (
+          <button
+            key={s || "all"}
+            type="button"
+            onClick={() => setFilter("status", s)}
+            className={`rounded-lg border px-3 py-1.5 text-sm ${
+              status === s ? "border-amber-500 text-amber-500" : "border-zinc-700"
+            }`}
+          >
+            {s === "" ? "همه" : s === "open" ? "باز" : "رسیدگی‌شده"}
+          </button>
+        ))}
+        {["", "user", "room", "video", "message"].map((t) => (
+          <button
+            key={t || "all-type"}
+            type="button"
+            onClick={() => setFilter("target_type", t)}
+            className={`rounded-lg border px-3 py-1.5 text-sm ${
+              targetType === t ? "border-sky-500 text-sky-400" : "border-zinc-700"
+            }`}
+          >
+            {t === "" ? "همه انواع" : TARGET_LABELS[t]}
+          </button>
+        ))}
       </div>
+
+      <AdminPanel>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px] text-sm">
+            <thead className="text-zinc-500">
+              <tr>
+                <th className="py-2 text-right">نوع</th>
+                <th className="py-2 text-right">شناسه هدف</th>
+                <th className="py-2 text-right">دلیل</th>
+                <th className="py-2 text-right">وضعیت</th>
+                <th className="py-2 text-right">تاریخ</th>
+                <th className="py-2 text-right">عملیات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((r) => (
+                <tr key={r.id} className="border-t border-zinc-800">
+                  <td className="py-2">{TARGET_LABELS[r.target_type] ?? r.target_type}</td>
+                  <td className="py-2 font-mono text-xs" dir="ltr">
+                    {r.target_id}
+                  </td>
+                  <td className="py-2 text-amber-500/90">{r.reason}</td>
+                  <td className="py-2">{r.status === "open" ? "باز" : "رسیدگی‌شده"}</td>
+                  <td className="py-2 text-xs text-zinc-500">{formatFaDate(r.created_at)}</td>
+                  <td className="py-2">
+                    {r.status !== "resolved" ? (
+                      <button
+                        type="button"
+                        onClick={() => setResolveId(r.id)}
+                        className="rounded border border-emerald-800 px-2 py-1 text-emerald-400"
+                      >
+                        رسیدگی
+                      </button>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {!reports.length ? (
+            <p className="py-8 text-center text-zinc-500">
+              گزارشی ثبت نشده. کاربران می‌توانند از بخش پشتیبانی گزارش ارسال کنند.
+            </p>
+          ) : null}
+        </div>
+        <PaginationBar page={page} totalPages={totalPages} total={total} />
+      </AdminPanel>
+
+      <AdminConfirmDialog
+        open={!!resolveId}
+        onClose={() => setResolveId(null)}
+        title="رسیدگی به گزارش"
+        description="این گزارش به‌عنوان رسیدگی‌شده علامت‌گذاری می‌شود."
+        confirmLabel="تأیید رسیدگی"
+        onConfirm={async () => {
+          if (resolveId) await resolveMut.mutateAsync(resolveId);
+        }}
+      />
     </div>
+  );
+}
+
+export default function AdminReportsPage() {
+  return (
+    <Suspense>
+      <ReportsContent />
+    </Suspense>
   );
 }

@@ -8,6 +8,8 @@ interface ConfirmActionModalProps {
   title: string;
   description: string;
   confirmLabel: string;
+  onConfirm?: () => void;
+  children?: React.ReactNode;
 }
 
 export function ConfirmActionModal({
@@ -16,14 +18,28 @@ export function ConfirmActionModal({
   title,
   description,
   confirmLabel,
+  onConfirm,
+  children,
 }: ConfirmActionModalProps) {
   return (
     <ModalShell open={open} onClose={onClose} title={title} description={description}>
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={onClose} className="rounded-xl border border-white/20 px-3 py-2 text-sm">
+      {children}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-xl border border-white/20 px-3 py-2 text-sm"
+        >
           انصراف
         </button>
-        <button type="button" className="rounded-xl bg-red-500 px-3 py-2 text-sm text-white">
+        <button
+          type="button"
+          onClick={() => {
+            onConfirm?.();
+            if (!onConfirm) onClose();
+          }}
+          className="rounded-xl bg-red-500 px-3 py-2 text-sm text-white"
+        >
           {confirmLabel}
         </button>
       </div>

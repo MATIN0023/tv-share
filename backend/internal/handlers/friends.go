@@ -18,7 +18,7 @@ type friendActionRequest struct {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/friends [get]
 func (h *Handler) ListFriends(w http.ResponseWriter, r *http.Request) {
-	friends, err := h.Repo.GetFriends(userID(r))
+	friends, err := h.Repo.GetFriends(r.Context(), userID(r))
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to get friends")
 		return
@@ -34,7 +34,7 @@ func (h *Handler) ListFriends(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {object} map[string]interface{}
 // @Router /api/friends/requests [get]
 func (h *Handler) ListFriendRequests(w http.ResponseWriter, r *http.Request) {
-	pending, err := h.Repo.GetPendingRequests(userID(r))
+	pending, err := h.Repo.GetPendingRequests(r.Context(), userID(r))
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to get pending requests")
 		return
@@ -61,7 +61,7 @@ func (h *Handler) SendFriendRequest(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "Cannot friend yourself")
 		return
 	}
-	if err := h.Repo.SendFriendRequest(uid, req.ToUserID); err != nil {
+	if err := h.Repo.SendFriendRequest(r.Context(), uid, req.ToUserID); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to send request")
 		return
 	}
@@ -82,7 +82,7 @@ func (h *Handler) AcceptFriendRequest(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	if err := h.Repo.AcceptFriendRequest(req.FromUserID, userID(r)); err != nil {
+	if err := h.Repo.AcceptFriendRequest(r.Context(), req.FromUserID, userID(r)); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to accept")
 		return
 	}
@@ -103,7 +103,7 @@ func (h *Handler) RejectFriendRequest(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	if err := h.Repo.RejectFriendRequest(req.FromUserID, userID(r)); err != nil {
+	if err := h.Repo.RejectFriendRequest(r.Context(), req.FromUserID, userID(r)); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to reject")
 		return
 	}

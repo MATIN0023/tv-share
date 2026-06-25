@@ -1,84 +1,122 @@
 package repository
 
-import "watch-party/internal/models"
+import (
+	"context"
 
-func (r *Repository) CreateRoom(id, name, ownerID, visibility, background string) error {
-	_, err := r.db.Exec(
-		`INSERT INTO rooms (id, name, owner_id, visibility, background) VALUES (?, ?, ?, ?, ?)`,
-		id, name, ownerID, visibility, background,
-	)
-	return err
-}
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
-func (r *Repository) SearchRooms(query string) ([]models.Room, error) {
-	rows, err := r.db.Query(`
-		SELECT id, name, COALESCE(video_path, ''), owner_id, visibility, background, created_at
-		FROM rooms
-		WHERE name LIKE ? OR owner_id IN (
-			SELECT id FROM users WHERE username LIKE ?
-		)
-		ORDER BY created_at DESC
-		LIMIT 50
-	`, "%"+query+"%", "%"+query+"%")
+	"watch-party/internal/models"
+	"watch-party/internal/util"
+)
+
+func (r *Repository) CreateRoom(ctx context.Context, name, ownerID, visibility, background string) (*models.Room, error) {
+	ownerOID, err := parseObjectID(ownerID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	return scanRooms(rows)
-}
-
-func (r *Repository) GetRoom(id string) (*models.Room, error) {
-	row := r.db.QueryRow(`
-		SELECT id, name, COALESCE(video_path, ''), owner_id, visibility, background, created_at,
-		       COALESCE(is_playing, 0), COALESCE(current_time, 0),
-		       COALESCE(is_paused, 0), COALESCE(duration, 0)
-		FROM rooms WHERE id = ?
-	`, id)
-	room := &models.Room{}
-	err := row.Scan(&room.ID, &room.Name, &room.VideoPath, &room.OwnerID, &room.Visibility, &room.Background, &room.CreatedAt,
-		&room.IsPlaying, &room.CurrentTime, &room.IsPaused, &room.Duration)
+	now := models.NowUTC()
+	room := models.Room{
+		ID:          primitive.NewObjectID(),
+		OwnerID:     ownerOID,
+		Slug:        util.GenerateInviteCode(),
+		Title:       name,
+		Visibility:  visibility,
+		Background:  background,
+		IsPublic:    visibility == "public",
+		Status:      models.RoomStatusActive,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	_, err = r.coll(collRooms).InsertOne(ctx, room)
 	if err != nil {
 		return nil, err
 	}
-	return room, nil
+	return &room, nil
 }
 
-func (r *Repository) ListRooms() ([]models.Room, error) {
-	rows, err := r.db.Query(`
-		SELECT id, name, COALESCE(video_path, ''), owner_id, visibility, background, created_at
-		FROM rooms ORDER BY created_at DESC
-	`)
+func (r *Repository) SearchRooms(ctx context.Context, query string) ([]models.Room, error) {
+	filter := bson.M{
+		"$or": []bson.M{
+			{"title": bson.M{"$regex": query, "$options": "i"}},
+			{"slug": bson.M{"$regex": query, "$options": "i"}},
+		},
+	}
+	cur, err := r.coll(collRooms).Find(ctx, filter, options.Find().SetLimit(50).SetSort(bson.D{{Key: "created_at", Value: -1}}))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	return scanRooms(rows)
+	defer cur.Close(ctx)
+	return decodeRooms(cur, ctx)
 }
 
-func (r *Repository) ListPublicVideoFeeds(limit int) ([]models.VideoFeed, error) {
-	rows, err := r.db.Query(`
-		SELECT r.id, r.name, COALESCE(r.video_path, ''), r.owner_id,
-		       u.display_name, COALESCE(u.avatar_url, ''), r.created_at
-		FROM rooms r
-		JOIN users u ON r.owner_id = u.id
-		WHERE r.video_path != '' AND r.video_path IS NOT NULL
-		  AND r.visibility = 'public'
-		ORDER BY r.created_at DESC
-		LIMIT ?
-	`, limit)
+func (r *Repository) GetRoom(ctx context.Context, id string) (*models.Room, error) {
+	oid, err := parseObjectID(id)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	var room models.Room
+	err = r.coll(collRooms).FindOne(ctx, bson.M{"_id": oid}).Decode(&room)
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+func (r *Repository) GetRoomBySlug(ctx context.Context, slug string) (*models.Room, error) {
+	var room models.Room
+	err := r.coll(collRooms).FindOne(ctx, bson.M{"slug": slug}).Decode(&room)
+	if err != nil {
+		return nil, err
+	}
+	return &room, nil
+}
+
+func (r *Repository) ListRooms(ctx context.Context) ([]models.Room, error) {
+	cur, err := r.coll(collRooms).Find(ctx, bson.M{}, optionsFindDesc("created_at"))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	return decodeRooms(cur, ctx)
+}
+
+func (r *Repository) ListPublicVideoFeeds(ctx context.Context, limit int64) ([]models.VideoFeed, error) {
+	pipeline := []bson.M{
+		{"$match": bson.M{
+			"is_public": true,
+			"video_url": bson.M{"$ne": ""},
+			"status":    models.RoomStatusActive,
+		}},
+		{"$sort": bson.M{"created_at": -1}},
+		{"$limit": limit},
+		{"$lookup": bson.M{
+			"from":         collUsers,
+			"localField":   "owner_id",
+			"foreignField": "_id",
+			"as":           "owner",
+		}},
+		{"$unwind": bson.M{"path": "$owner", "preserveNullAndEmptyArrays": true}},
+		{"$project": bson.M{
+			"room_id":       "$_id",
+			"room_name":     "$title",
+			"video_path":    "$video_url",
+			"owner_id":      "$owner_id",
+			"owner_name":    "$owner.display_name",
+			"owner_avatar":  "$owner.avatar_url",
+			"created_at":    "$created_at",
+		}},
+	}
+	cur, err := r.coll(collRooms).Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
 
 	var feeds []models.VideoFeed
-	for rows.Next() {
-		var f models.VideoFeed
-		if err := rows.Scan(&f.RoomID, &f.RoomName, &f.VideoPath, &f.OwnerID,
-			&f.OwnerName, &f.OwnerAvatar, &f.CreatedAt); err != nil {
-			return nil, err
-		}
-		feeds = append(feeds, f)
+	if err := cur.All(ctx, &feeds); err != nil {
+		return nil, err
 	}
 	if feeds == nil {
 		feeds = []models.VideoFeed{}
@@ -86,39 +124,45 @@ func (r *Repository) ListPublicVideoFeeds(limit int) ([]models.VideoFeed, error)
 	return feeds, nil
 }
 
-func (r *Repository) UpdateRoomPlayback(room *models.Room) error {
-	_, err := r.db.Exec(`
-		UPDATE rooms SET
-			is_playing = ?,
-			current_time = ?,
-			is_paused = ?,
-			duration = ?
-		WHERE id = ?
-	`, room.IsPlaying, room.CurrentTime, room.IsPaused, room.Duration, room.ID)
+func (r *Repository) UpdateRoomPlayback(ctx context.Context, room *models.Room) error {
+	room.UpdatedAt = models.NowUTC()
+	_, err := r.coll(collRooms).UpdateByID(ctx, room.ID, bson.M{"$set": bson.M{
+		"is_playing":   room.IsPlaying,
+		"current_time": room.CurrentTime,
+		"is_paused":    room.IsPaused,
+		"duration":     room.Duration,
+		"updated_at":   room.UpdatedAt,
+	}})
 	return err
 }
 
-func (r *Repository) UpdateRoomVideo(roomID, videoPath string) error {
-	_, err := r.db.Exec(`UPDATE rooms SET video_path = ? WHERE id = ?`, videoPath, roomID)
+func (r *Repository) UpdateRoomVideo(ctx context.Context, roomID, videoURL string) error {
+	oid, err := parseObjectID(roomID)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll(collRooms).UpdateByID(ctx, oid, bson.M{"$set": bson.M{
+		"video_url":  videoURL,
+		"updated_at": models.NowUTC(),
+	}})
 	return err
 }
 
-func (r *Repository) DeleteRoom(id string) error {
-	_, err := r.db.Exec(`DELETE FROM rooms WHERE id = ?`, id)
+func (r *Repository) DeleteRoom(ctx context.Context, id string) error {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll(collRooms).DeleteOne(ctx, bson.M{"_id": oid})
 	return err
 }
 
-func scanRooms(rows interface {
-	Next() bool
-	Scan(dest ...interface{}) error
-}) ([]models.Room, error) {
+func decodeRooms(cur interface {
+	All(context.Context, interface{}) error
+}, ctx context.Context) ([]models.Room, error) {
 	var rooms []models.Room
-	for rows.Next() {
-		var room models.Room
-		if err := rows.Scan(&room.ID, &room.Name, &room.VideoPath, &room.OwnerID, &room.Visibility, &room.Background, &room.CreatedAt); err != nil {
-			return nil, err
-		}
-		rooms = append(rooms, room)
+	if err := cur.All(ctx, &rooms); err != nil {
+		return nil, err
 	}
 	if rooms == nil {
 		rooms = []models.Room{}

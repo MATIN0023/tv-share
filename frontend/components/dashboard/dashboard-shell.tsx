@@ -15,17 +15,26 @@ import {
   LogOut,
   Bell,
   Headphones,
+  AlertTriangle,
 } from "lucide-react";
 import { ThemeSwitch } from "@/components/ThemeSwitch";
 import { cn } from "@/lib/utils";
+import { useLogout } from "@/hooks/use-auth";
+import { useMe } from "@/hooks/use-me";
+import { usePublicSettings } from "@/hooks/use-public-settings";
 
-const mainNavItems = [
-  { href: "/dashboard", label: "نمای کلی", icon: LayoutDashboard },
-  { href: "/rooms", label: "روم‌ها / واچ پارتی", icon: DoorOpen },
-  { href: "/library", label: "ویدیوها / کتابخانه من", icon: Video },
-  { href: "/friends", label: "دوستان", icon: Users },
-  { href: "/billing", label: "اشتراک / پرداخت", icon: CreditCard },
-  { href: "/profile", label: "پروفایل", icon: UserCircle2 },
+const mainNavItems: {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  settingsKey: "payment_enabled" | null;
+}[] = [
+  { href: "/dashboard", label: "نمای کلی", icon: LayoutDashboard, settingsKey: null },
+  { href: "/rooms", label: "روم‌ها / واچ پارتی", icon: DoorOpen, settingsKey: null },
+  { href: "/library", label: "ویدیوها / کتابخانه من", icon: Video, settingsKey: null },
+  { href: "/friends", label: "دوستان", icon: Users, settingsKey: null },
+  { href: "/billing", label: "اشتراک / پرداخت", icon: CreditCard, settingsKey: "payment_enabled" },
+  { href: "/profile", label: "پروفایل", icon: UserCircle2, settingsKey: null },
 ];
 
 const serviceNavItems = [
@@ -74,6 +83,16 @@ function NavLink({
 export function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const logout = useLogout();
+  const { data: me } = useMe();
+  const { data: settings } = usePublicSettings();
+
+  const siteName = settings?.site_name?.trim() || "مــــــــــــوی سیـــــــنک";
+  const showBilling = settings?.payment_enabled !== false;
+  const visibleMainNav = mainNavItems.filter((item) => {
+    if (item.settingsKey === "payment_enabled") return showBilling;
+    return true;
+  });
 
   return (
     <div className="min-h-screen page-glass-bg text-foreground">
@@ -85,7 +104,14 @@ export function DashboardShell({ children }: DashboardShellProps) {
           )}
         >
           <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
-            <h2 className="text-lg font-bold">داشبورد MovieSync</h2>
+            <div>
+              <h2 className="text-lg font-bold">{siteName}</h2>
+              {me ? (
+                <p className="text-xs text-muted-foreground">
+                  @{me.display_name ?? me.phone_number}
+                </p>
+              ) : null}
+            </div>
             <button
               type="button"
               className="rounded-md p-2 md:hidden"
@@ -99,7 +125,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
           <nav className="flex-1 space-y-4 overflow-y-auto">
             <div className="space-y-2">
               <p className="px-2 text-xs text-muted-foreground">اصلی</p>
-              {mainNavItems.map((item) => (
+              {visibleMainNav.map((item) => (
                 <NavLink
                   key={item.href}
                   item={item}
@@ -120,7 +146,6 @@ export function DashboardShell({ children }: DashboardShellProps) {
                 />
               ))}
             </div>
-
           </nav>
 
           <div className="mt-auto space-y-3 border-t border-white/10 pt-4">
@@ -130,6 +155,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
             </div>
             <button
               type="button"
+              onClick={logout}
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-400 transition hover:bg-red-500/20"
             >
               <LogOut className="size-4" />
@@ -149,6 +175,19 @@ export function DashboardShell({ children }: DashboardShellProps) {
               <Menu className="size-5" />
             </button>
           </div>
+
+          {settings?.maintenance_mode ? (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <p>سرویس در حالت تعمیرات است. برخی امکانات ممکن است محدود باشند.</p>
+            </div>
+          ) : null}
+
+          {settings?.announcement_text?.trim() ? (
+            <div className="mb-4 rounded-xl border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+              {settings.announcement_text}
+            </div>
+          ) : null}
 
           <main className="flex-1">{children}</main>
         </div>

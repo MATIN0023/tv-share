@@ -1,25 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
 import { AdminPanel } from "@/components/admin/admin-panel";
+import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
+import { ToggleSwitch } from "@/components/admin/toggle-switch";
 import { Input } from "@/components/ui/input";
+import {
+  useAdminSettings,
+  useSetMaintenanceMode,
+  useUpdateAdminSettings,
+} from "@/hooks/use-admin";
 
 export default function AdminSettingsPage() {
-  const [siteName, setSiteName] = useState("MovieSync");
-  const [loginEnabled, setLoginEnabled] = useState(true);
-  const [signupEnabled, setSignupEnabled] = useState(true);
-  const [maintenance, setMaintenance] = useState(false);
+  const settingsQ = useAdminSettings();
+  const updateMut = useUpdateAdminSettings();
+  const maintenanceMut = useSetMaintenanceMode();
+
+  const [siteName, setSiteName] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
+  const [supportPhone, setSupportPhone] = useState("");
+  const [announcement, setAnnouncement] = useState("");
+  const [maxUpload, setMaxUpload] = useState(500);
+  const [maintenanceConfirm, setMaintenanceConfirm] = useState(false);
+  const [pendingMaintenance, setPendingMaintenance] = useState(false);
+
+  useEffect(() => {
+    if (settingsQ.data) {
+      const s = settingsQ.data;
+      setSiteName(s.site_name);
+      setSupportEmail(s.support_email);
+      setSupportPhone(s.support_phone ?? "");
+      setAnnouncement(s.announcement_text ?? "");
+      setMaxUpload(s.max_upload_size_mb || 500);
+    }
+  }, [settingsQ.data]);
+
+  const s = settingsQ.data;
+
+  const handleMaintenanceToggle = (enabled: boolean) => {
+    setPendingMaintenance(enabled);
+    setMaintenanceConfirm(true);
+  };
 
   return (
     <div>
       <AdminSectionHeader
         title="تنظیمات سیستم"
-        description="تنظیمات عمومی، ورود/ثبت‌نام و حالت تعمیرات."
+        description="کنترل دسترسی، پرداخت، اعلان‌ها و رفتار کلی پلتفرم"
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AdminPanel title="عمومی">
+        <AdminPanel title="اطلاعات عمومی">
           <div className="space-y-3">
             <div>
               <label className="text-xs text-zinc-500">نام سایت</label>
@@ -30,64 +62,120 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">URL لوگو</label>
+              <label className="text-xs text-zinc-500">ایمیل پشتیبانی</label>
               <Input
                 className="mt-1 border-zinc-700 bg-zinc-950"
-                placeholder="https://..."
                 dir="ltr"
+                value={supportEmail}
+                onChange={(e) => setSupportEmail(e.target.value)}
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">قوانین و مقررات</label>
+              <label className="text-xs text-zinc-500">تلفن پشتیبانی</label>
+              <Input
+                className="mt-1 border-zinc-700 bg-zinc-950"
+                dir="ltr"
+                value={supportPhone}
+                onChange={(e) => setSupportPhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500">اعلان سراسری (نمایش در داشبورد)</label>
               <textarea
-                rows={4}
-                className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-2 text-sm"
-                placeholder="متن قوانین..."
+                className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+                rows={3}
+                value={announcement}
+                onChange={(e) => setAnnouncement(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500">حداکثر حجم آپلود (مگابایت)</label>
+              <Input
+                type="number"
+                className="mt-1 border-zinc-700 bg-zinc-950"
+                value={maxUpload}
+                onChange={(e) => setMaxUpload(Number(e.target.value))}
               />
             </div>
             <button
               type="button"
-              className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-zinc-950"
+              disabled={updateMut.isPending}
+              onClick={() =>
+                updateMut.mutate({
+                  site_name: siteName,
+                  support_email: supportEmail,
+                  support_phone: supportPhone,
+                  announcement_text: announcement,
+                  max_upload_size_mb: maxUpload,
+                })
+              }
+              className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-zinc-950 disabled:opacity-50"
             >
-              ذخیره تنظیمات
+              ذخیره تنظیمات عمومی
             </button>
           </div>
         </AdminPanel>
 
-        <AdminPanel title="دسترسی و نگهداری">
-          <div className="space-y-4">
-            <label className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-3 text-sm">
-              <span>ورود کاربران</span>
-              <input
-                type="checkbox"
-                checked={loginEnabled}
-                onChange={(e) => setLoginEnabled(e.target.checked)}
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-3 text-sm">
-              <span>ثبت‌نام جدید</span>
-              <input
-                type="checkbox"
-                checked={signupEnabled}
-                onChange={(e) => setSignupEnabled(e.target.checked)}
-              />
-            </label>
-            <label className="flex items-center justify-between rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-3 text-sm">
-              <span>حالت تعمیرات (Maintenance)</span>
-              <input
-                type="checkbox"
-                checked={maintenance}
-                onChange={(e) => setMaintenance(e.target.checked)}
-              />
-            </label>
-            {maintenance ? (
-              <p className="text-xs text-amber-400">
-                در این حالت کاربران عادی به سایت دسترسی ندارند؛ فقط ادمین.
-              </p>
-            ) : null}
+        <AdminPanel title="دسترسی و سرویس‌ها">
+          <div className="space-y-3 text-sm">
+            <ToggleSwitch
+              label="ورود کاربران"
+              description="غیرفعال = هیچ کس نمی‌تواند وارد شود"
+              checked={s?.login_enabled ?? true}
+              disabled={updateMut.isPending}
+              onChange={(v) => updateMut.mutate({ login_enabled: v })}
+            />
+            <ToggleSwitch
+              label="ثبت‌نام جدید"
+              checked={s?.signup_enabled ?? true}
+              disabled={updateMut.isPending}
+              onChange={(v) => updateMut.mutate({ signup_enabled: v })}
+            />
+            <ToggleSwitch
+              label="پرداخت آنلاین"
+              checked={s?.payment_enabled ?? true}
+              disabled={updateMut.isPending}
+              onChange={(v) => updateMut.mutate({ payment_enabled: v })}
+            />
+            <ToggleSwitch
+              label="ورود با OTP"
+              checked={s?.otp_enabled ?? true}
+              disabled={updateMut.isPending}
+              onChange={(v) => updateMut.mutate({ otp_enabled: v })}
+            />
+            <ToggleSwitch
+              label="اتاق مهمان"
+              checked={s?.allow_guest_rooms ?? true}
+              disabled={updateMut.isPending}
+              onChange={(v) => updateMut.mutate({ allow_guest_rooms: v })}
+            />
+            <ToggleSwitch
+              label="حالت تعمیرات"
+              description="فقط مدیران به API دسترسی دارند"
+              danger
+              checked={s?.maintenance_mode ?? false}
+              disabled={maintenanceMut.isPending}
+              onChange={handleMaintenanceToggle}
+            />
           </div>
         </AdminPanel>
       </div>
+
+      <AdminConfirmDialog
+        open={maintenanceConfirm}
+        onClose={() => setMaintenanceConfirm(false)}
+        title={pendingMaintenance ? "فعال‌سازی حالت تعمیرات" : "خروج از حالت تعمیرات"}
+        description={
+          pendingMaintenance
+            ? "کاربران عادی نمی‌توانند از سرویس استفاده کنند. ادامه می‌دهید؟"
+            : "سرویس برای همه کاربران باز می‌شود."
+        }
+        variant={pendingMaintenance ? "danger" : "primary"}
+        confirmLabel="تأیید"
+        onConfirm={async () => {
+          await maintenanceMut.mutateAsync(pendingMaintenance);
+        }}
+      />
     </div>
   );
 }

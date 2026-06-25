@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -77,60 +78,64 @@ func (c *Client) writePump() {
 	}
 }
 
+func (c *Client) ctx() context.Context {
+	return context.Background()
+}
+
 func (c *Client) handleVideoPlay() {
 	if c.roomID == "" {
 		return
 	}
-	room, err := c.hub.repo.GetRoom(c.roomID)
+	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
 	if err != nil {
 		return
 	}
 	room.IsPlaying = true
 	room.IsPaused = false
-	_ = c.hub.repo.UpdateRoomPlayback(room)
-	c.hub.BroadcastRoomState(room.ID)
+	_ = c.hub.repo.UpdateRoomPlayback(c.ctx(), room)
+	c.hub.BroadcastRoomState(c.roomID)
 }
 
 func (c *Client) handleVideoPause() {
 	if c.roomID == "" {
 		return
 	}
-	room, err := c.hub.repo.GetRoom(c.roomID)
+	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
 	if err != nil {
 		return
 	}
 	room.IsPlaying = false
 	room.IsPaused = true
-	_ = c.hub.repo.UpdateRoomPlayback(room)
-	c.hub.BroadcastRoomState(room.ID)
+	_ = c.hub.repo.UpdateRoomPlayback(c.ctx(), room)
+	c.hub.BroadcastRoomState(c.roomID)
 }
 
 func (c *Client) handleVideoSeek(msg *Message) {
 	if c.roomID == "" {
 		return
 	}
-	room, err := c.hub.repo.GetRoom(c.roomID)
+	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
 	if err != nil {
 		return
 	}
 	room.CurrentTime = msg.CurrentTime
-	_ = c.hub.repo.UpdateRoomPlayback(room)
-	c.hub.BroadcastRoomState(room.ID)
+	_ = c.hub.repo.UpdateRoomPlayback(c.ctx(), room)
+	c.hub.BroadcastRoomState(c.roomID)
 }
 
 func (c *Client) handleVideoEnded() {
 	if c.roomID == "" {
 		return
 	}
-	room, err := c.hub.repo.GetRoom(c.roomID)
+	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
 	if err != nil {
 		return
 	}
 	room.IsPlaying = false
 	room.IsPaused = false
 	room.CurrentTime = 0
-	_ = c.hub.repo.UpdateRoomPlayback(room)
-	c.hub.BroadcastRoomState(room.ID)
+	_ = c.hub.repo.UpdateRoomPlayback(c.ctx(), room)
+	c.hub.BroadcastRoomState(c.roomID)
 }
 
 func (c *Client) handleChat(msg *Message) {
@@ -139,14 +144,14 @@ func (c *Client) handleChat(msg *Message) {
 	}
 
 	senderName := c.nickname
-	if user, err := c.hub.repo.GetUserByID(c.userID); err == nil && user.DisplayName != "" {
+	if user, err := c.hub.repo.GetUserByID(c.ctx(), c.userID); err == nil && user.DisplayName != "" {
 		senderName = user.DisplayName
 	}
 
-	_, _ = c.hub.repo.SaveMessage(c.roomID, c.userID, senderName, msg.Text)
+	_, _ = c.hub.repo.SaveMessage(c.ctx(), c.roomID, c.userID, senderName, msg.Text)
 	msg.From = senderName
 	msg.FromID = c.userID
-	msg.Time = time.Now().Format("15:04")
+	msg.Time = time.Now().UTC().Format("15:04")
 	c.hub.BroadcastToRoom(c.roomID, msg)
 }
 
@@ -154,20 +159,20 @@ func (c *Client) handleVideoChange(msg *Message) {
 	if c.roomID == "" {
 		return
 	}
-	_ = c.hub.repo.UpdateRoomVideo(c.roomID, msg.Video)
+	_ = c.hub.repo.UpdateRoomVideo(c.ctx(), c.roomID, msg.Video)
 	msg.From = c.nickname
 	msg.FromID = c.userID
 	c.hub.BroadcastToRoom(c.roomID, msg)
 }
 
 func (c *Client) sendHistory() {
-	messages, _ := c.hub.repo.GetMessages(c.roomID, 100)
+	messages, _ := c.hub.repo.GetMessages(c.ctx(), c.roomID, 100)
 	for _, m := range messages {
 		c.send <- &Message{
 			Type:   "chat",
 			Text:   m.Content,
 			From:   m.SenderName,
-			FromID: m.SenderID,
+			FromID: m.SenderID.Hex(),
 			Time:   m.Timestamp.Format("15:04"),
 		}
 	}

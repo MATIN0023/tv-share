@@ -10,7 +10,7 @@ import "net/http"
 // @Success 200 {array} swaggerVideoFeed
 // @Router /api/feed [get]
 func (h *Handler) GetFeed(w http.ResponseWriter, r *http.Request) {
-	feeds, err := h.Repo.ListPublicVideoFeeds(50)
+	feeds, err := h.Repo.ListPublicVideoFeeds(r.Context(), 50)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to load feed")
 		return
@@ -26,7 +26,7 @@ func (h *Handler) GetFeed(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} swaggerWatchHistory
 // @Router /api/watch-history [get]
 func (h *Handler) GetWatchHistory(w http.ResponseWriter, r *http.Request) {
-	history, err := h.Repo.GetWatchHistory(userID(r), 50)
+	history, err := h.Repo.GetWatchHistory(r.Context(), userID(r), 50)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to load watch history")
 		return
@@ -42,7 +42,7 @@ func (h *Handler) GetWatchHistory(w http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} swaggerRoom
 // @Router /api/room-history [get]
 func (h *Handler) GetRoomHistory(w http.ResponseWriter, r *http.Request) {
-	rooms, err := h.Repo.GetRoomHistory(userID(r), 50)
+	rooms, err := h.Repo.GetRoomHistory(r.Context(), userID(r), 50)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to load room history")
 		return

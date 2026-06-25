@@ -5,102 +5,121 @@ import (
 	"log"
 	"net/http"
 
+	"go.mongodb.org/mongo-driver/mongo"
+
 	"watch-party/internal/auth"
-	"watch-party/internal/util"
+	"watch-party/internal/phone"
 )
 
 type registerRequest struct {
-	Username    string `json:"username"`
+	PhoneNumber string `json:"phone_number"`
 	Password    string `json:"password"`
 	DisplayName string `json:"display_name"`
 }
 
 type loginRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	PhoneNumber string `json:"phone_number"`
+	Password    string `json:"password"`
 }
 
-// Register godoc
-// @Summary Register a new user
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param body body registerRequest true "Registration payload"
-// @Success 201 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 409 {object} map[string]string
-// @Router /auth/register [post]
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.Repo.IsSettingsFlagEnabled(r.Context(), "signup_enabled", true) {
+		WriteJSONError(w, http.StatusForbidden, "ثبت‌نام موقتاً غیرفعال است")
+		return
+	}
 	var req registerRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	if len(req.Username) < 3 {
-		WriteJSONError(w, http.StatusBadRequest, "Username must be at least 3 characters")
+	normalized := phone.Normalize(req.PhoneNumber)
+	if !phone.Valid(normalized) {
+		WriteJSONError(w, http.StatusBadRequest, "Invalid phone number format (use 09XXXXXXXXX)")
 		return
 	}
-	if len(req.Password) < 6 {
-		WriteJSONError(w, http.StatusBadRequest, "Password must be at least 6 characters")
+	if len(req.Password) < 8 {
+		WriteJSONError(w, http.StatusBadRequest, "Password must be at least 8 characters")
 		return
 	}
-	if _, err := h.Repo.GetUserByUsername(req.Username); err == nil {
-		WriteJSONError(w, http.StatusConflict, "Username already taken")
+	if _, err := h.Repo.GetUserByPhone(r.Context(), normalized); err == nil {
+		WriteJSONError(w, http.StatusConflict, "Phone number already registered")
+		return
+	} else if err != mongo.ErrNoDocuments {
+		WriteJSONError(w, http.StatusInternalServerError, "Failed to check phone")
 		return
 	}
 
-	id := util.GenerateID()
-	if err := h.Repo.CreateUser(id, req.Username, req.Password, req.DisplayName); err != nil {
+	displayName := req.DisplayName
+	if displayName == "" {
+		displayName = normalized
+	}
+
+	user, err := h.Repo.CreateUserWithPassword(r.Context(), normalized, req.Password, displayName)
+	if err != nil {
 		log.Printf("Failed to create user: %v", err)
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
 
-	token, err := h.JWT.Generate(id, req.Username)
+	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create token")
 		return
 	}
 	WriteJSON(w, http.StatusCreated, map[string]string{
-		"token":   token,
-		"user":    req.Username,
-		"user_id": id,
+		"token":        token,
+		"phone_number": user.PhoneNumber,
+		"user_id":      user.ID.Hex(),
+		"display_name": user.DisplayName,
+		"role":         user.Role,
 	})
 }
 
-// Login godoc
-// @Summary Authenticate user
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param body body loginRequest true "Login payload"
-// @Success 200 {object} map[string]string
-// @Failure 401 {object} map[string]string
-// @Router /auth/login [post]
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	if !h.Repo.IsSettingsFlagEnabled(r.Context(), "login_enabled", true) {
+		WriteJSONError(w, http.StatusForbidden, "ورود موقتاً غیرفعال است")
+		return
+	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
+	normalized := phone.Normalize(req.PhoneNumber)
+	if !phone.Valid(normalized) {
+		WriteJSONError(w, http.StatusBadRequest, "Invalid phone number format")
+		return
+	}
 
-	user, err := h.Repo.GetUserByUsername(req.Username)
-	if err != nil || !h.Repo.CheckPassword(req.Password, user.PasswordHash) {
+	user, err := h.Repo.GetUserByPhone(r.Context(), normalized)
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, "Invalid credentials")
+		return
+	}
+	if !user.IsActive {
+		WriteJSONError(w, http.StatusForbidden, "Account is suspended")
+		return
+	}
+	if !h.Repo.CheckPassword(req.Password, user.PasswordHash) {
 		WriteJSONError(w, http.StatusUnauthorized, "Invalid credentials")
 		return
 	}
 
-	token, err := h.JWT.Generate(user.ID, user.Username)
+	_ = h.Repo.TouchLastLogin(r.Context(), user.ID.Hex())
+	_ = h.Repo.WriteActivityLog(r.Context(), user.ID.Hex(), user.Role, "login", "user", user.ID.Hex(), "")
+
+	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create token")
 		return
 	}
 	WriteJSON(w, http.StatusOK, map[string]string{
 		"token":        token,
-		"user":         user.Username,
-		"user_id":      user.ID,
+		"phone_number": user.PhoneNumber,
+		"user_id":      user.ID.Hex(),
 		"display_name": user.DisplayName,
 		"avatar":       user.AvatarURL,
+		"role":         user.Role,
 	})
 }
 

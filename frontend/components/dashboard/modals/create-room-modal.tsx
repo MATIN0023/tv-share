@@ -8,11 +8,35 @@ import { DateTimeField } from "@/components/forms/date-time-field";
 interface CreateRoomModalProps {
   open: boolean;
   onClose: () => void;
+  onSubmit?: (payload: {
+    name: string;
+    visibility: string;
+    scheduledAt?: string;
+  }) => void | Promise<void>;
+  isSubmitting?: boolean;
 }
 
-export function CreateRoomModal({ open, onClose }: CreateRoomModalProps) {
+export function CreateRoomModal({
+  open,
+  onClose,
+  onSubmit,
+  isSubmitting = false,
+}: CreateRoomModalProps) {
+  const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
   const [startAt, setStartAt] = useState("");
+
+  const handleSubmit = async () => {
+    if (!name.trim()) return;
+    await onSubmit?.({
+      name: name.trim(),
+      visibility: isPrivate ? "private" : "public",
+      scheduledAt: startAt || undefined,
+    });
+    setName("");
+    setStartAt("");
+    onClose();
+  };
 
   return (
     <ModalShell
@@ -22,14 +46,12 @@ export function CreateRoomModal({ open, onClose }: CreateRoomModalProps) {
       description="تنظیمات اتاق را مشخص کنید."
     >
       <div className="space-y-3">
-        <Input placeholder="نام اتاق" />
-        <Input placeholder="نام فیلم انتخابی" />
+        <Input
+          placeholder="نام اتاق"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
         <DateTimeField value={startAt} onChange={setStartAt} />
-        {startAt ? (
-          <p className="text-xs text-muted-foreground" dir="ltr">
-            ISO: {startAt}
-          </p>
-        ) : null}
         <div className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm">
           <span>نوع اتاق</span>
           <button
@@ -40,17 +62,13 @@ export function CreateRoomModal({ open, onClose }: CreateRoomModalProps) {
             {isPrivate ? "خصوصی" : "عمومی"}
           </button>
         </div>
-        {isPrivate ? <Input placeholder="رمز اتاق" dir="ltr" className="text-left" /> : null}
-        <div className="grid grid-cols-2 gap-2">
-          <button type="button" className="rounded-xl border border-white/20 px-3 py-2 text-sm">
-            چت فعال
-          </button>
-          <button type="button" className="rounded-xl border border-white/20 px-3 py-2 text-sm">
-            میکروفن فعال
-          </button>
-        </div>
-        <button type="button" className="w-full rounded-xl bg-primary px-3 py-2 text-sm text-white">
-          ایجاد اتاق
+        <button
+          type="button"
+          disabled={isSubmitting || !name.trim()}
+          onClick={handleSubmit}
+          className="w-full rounded-xl bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"
+        >
+          {isSubmitting ? "در حال ایجاد..." : "ایجاد اتاق"}
         </button>
       </div>
     </ModalShell>

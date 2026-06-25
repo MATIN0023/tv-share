@@ -1,39 +1,56 @@
 package repository
 
 import (
+	"context"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
+
 	"watch-party/internal/models"
-	"watch-party/internal/util"
 )
 
-func (r *Repository) SaveMessage(roomID, senderID, senderName, content string) (string, error) {
-	id := util.GenerateID()
-	_, err := r.db.Exec(
-		`INSERT INTO messages (id, room_id, sender_id, sender_name, content) VALUES (?, ?, ?, ?, ?)`,
-		id, roomID, senderID, senderName, content,
-	)
-	return id, err
+func (r *Repository) SaveMessage(ctx context.Context, roomID, senderID, senderName, content string) (string, error) {
+	roomOID, err := parseObjectID(roomID)
+	if err != nil {
+		return "", err
+	}
+	senderOID, err := parseObjectID(senderID)
+	if err != nil {
+		return "", err
+	}
+	msg := models.Message{
+		ID:         primitive.NewObjectID(),
+		RoomID:     roomOID,
+		SenderID:   senderOID,
+		SenderName: senderName,
+		Content:    content,
+		Timestamp:  models.NowUTC(),
+	}
+	_, err = r.coll(collMessages).InsertOne(ctx, msg)
+	if err != nil {
+		return "", err
+	}
+	return msg.ID.Hex(), nil
 }
 
-func (r *Repository) GetMessages(roomID string, limit int) ([]models.Message, error) {
-	rows, err := r.db.Query(`
-		SELECT id, room_id, sender_id, sender_name, content, timestamp
-		FROM messages
-		WHERE room_id = ?
-		ORDER BY timestamp ASC
-		LIMIT ?
-	`, roomID, limit)
+func (r *Repository) GetMessages(ctx context.Context, roomID string, limit int64) ([]models.Message, error) {
+	roomOID, err := parseObjectID(roomID)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	cur, err := r.coll(collMessages).Find(ctx,
+		bson.M{"room_id": roomOID},
+		options.Find().SetSort(bson.D{{Key: "timestamp", Value: 1}}).SetLimit(limit),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
 
 	var msgs []models.Message
-	for rows.Next() {
-		var m models.Message
-		if err := rows.Scan(&m.ID, &m.RoomID, &m.SenderID, &m.SenderName, &m.Content, &m.Timestamp); err != nil {
-			return nil, err
-		}
-		msgs = append(msgs, m)
+	if err := cur.All(ctx, &msgs); err != nil {
+		return nil, err
 	}
 	if msgs == nil {
 		msgs = []models.Message{}

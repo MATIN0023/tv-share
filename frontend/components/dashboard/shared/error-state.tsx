@@ -2,7 +2,7 @@ import { AlertTriangle } from "lucide-react";
 
 interface ErrorStateProps {
   title: string;
-  description: string;
+  description?: string;
   onRetry?: () => void;
 }
 

@@ -4,8 +4,8 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider";
 import StyledComponentsRegistry from '@/lib/registry';
-import { Navbar } from '@/components/Navbar';
-import { Footer } from '@/components/Footer';
+import { QueryProvider } from "@/providers/query-provider";
+import { ToastContainer } from "@/components/ui/toast-container";
 
 const peyda = localFont({
   src: [
@@ -49,7 +49,10 @@ export default function RootLayout({
       <body className={peyda.variable}>
         <StyledComponentsRegistry>
           <ThemeProvider>
-          {children}
+            <QueryProvider>
+              {children}
+              <ToastContainer />
+            </QueryProvider>
           </ThemeProvider>
         </StyledComponentsRegistry>
       </body>

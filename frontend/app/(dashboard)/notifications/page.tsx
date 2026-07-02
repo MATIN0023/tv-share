@@ -9,7 +9,7 @@ import {
   type NotificationType,
 } from "@/components/dashboard/tables/notifications-table";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
-import { ErrorState } from "@/components/dashboard/shared/error-state";
+import { QueryError } from "@/components/dashboard/shared/query-error";
 import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
 import {
   useMarkAllNotificationsRead,
@@ -17,6 +17,7 @@ import {
   useNotifications,
 } from "@/hooks/use-notifications";
 import { formatFaDate } from "@/lib/utils/format-date";
+import { useTranslation } from "@/providers/i18n-provider";
 
 type FilterTab = "all" | NotificationType;
 
@@ -26,8 +27,9 @@ function mapType(t: string): NotificationType {
 }
 
 export default function NotificationsPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<FilterTab>("all");
-  const { data, isLoading, isError, refetch } = useNotifications();
+  const { data, isLoading, isError, error, refetch } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
 
@@ -55,26 +57,26 @@ export default function NotificationsPage() {
 
   return (
     <div>
-      <SectionHeader title="اعلانات" description="GET /api/notifications" />
+      <SectionHeader title={t("dashboard.notificationsTitle")} description="GET /api/notifications" />
 
       {isError ? (
-        <ErrorState title="خطا در دریافت اعلانات" onRetry={() => refetch()} />
+        <QueryError error={error} context="notifications.load" onRetry={() => refetch()} />
       ) : null}
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3 md:mb-6">
-        <GlassPanel title="خوانده‌نشده">
+        <GlassPanel title={t("dashboard.unread")}>
           <p className="text-2xl font-bold text-primary">{unreadCount}</p>
         </GlassPanel>
-        <GlassPanel title="کل">
+        <GlassPanel title={t("dashboard.total")}>
           <p className="text-2xl font-bold">{items.length}</p>
         </GlassPanel>
-        <GlassPanel title="اقدام">
+        <GlassPanel title={t("dashboard.action")}>
           <button
             type="button"
             onClick={() => markAll.mutate()}
             className="mt-1 rounded-xl border border-white/20 px-3 py-2 text-sm"
           >
-            همه خوانده
+            {t("dashboard.markAllReadShort")}
           </button>
         </GlassPanel>
       </div>
@@ -82,10 +84,10 @@ export default function NotificationsPage() {
       <div className="mb-4 flex flex-wrap gap-2 md:mb-6">
         {(
           [
-            { key: "all", label: "همه" },
-            { key: "room_invite", label: "دعوت" },
-            { key: "friend_request", label: "دوستی" },
-            { key: "system", label: "سیستم" },
+            { key: "all", label: t("common.all") },
+            { key: "room_invite", label: t("dashboard.invite") },
+            { key: "friend_request", label: t("dashboard.friendship") },
+            { key: "system", label: t("dashboard.system") },
           ] as const
         ).map((item) => (
           <button
@@ -101,14 +103,14 @@ export default function NotificationsPage() {
         ))}
       </div>
 
-      <GlassPanel title="تاریخچه">
+      <GlassPanel title={t("dashboard.history")}>
         {filtered.length ? (
           <NotificationsTable
             rows={filtered}
             onMarkRead={(id) => markRead.mutate(id)}
           />
         ) : (
-          <EmptyState title="اعلانی نیست" />
+          <EmptyState title={t("dashboard.noNotificationsShort")} />
         )}
       </GlassPanel>
     </div>

@@ -8,16 +8,18 @@ import { VideosTable } from "@/components/dashboard/tables/videos-table";
 import { UploadVideoModal } from "@/components/dashboard/modals/upload-video-modal";
 import { SearchField } from "@/components/forms/search-field";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
-import { ErrorState } from "@/components/dashboard/shared/error-state";
+import { QueryError } from "@/components/dashboard/shared/query-error";
 import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
 import { useFeed, useWatchHistory } from "@/hooks/use-feed";
 import { useSchedule } from "@/hooks/use-schedule";
 import { useDeleteVideo, useUploadVideo, useVideos } from "@/hooks/use-videos";
 import { formatFaDate } from "@/lib/utils/format-date";
+import { useTranslation } from "@/providers/i18n-provider";
 
 type Tab = "uploaded" | "watchlist" | "discover" | "history";
 
 export default function LibraryPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>("uploaded");
   const [search, setSearch] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -37,7 +39,10 @@ export default function LibraryPage() {
         .map((v) => ({
           id: v.id,
           title: v.title,
-          progress: v.process_status === "ready" ? "۱۰۰٪" : "—",
+          progress:
+            v.process_status === "ready"
+              ? t("dashboard.percentWatchedFull")
+              : t("common.dash"),
           status: v.process_status,
         }));
     }
@@ -50,11 +55,13 @@ export default function LibraryPage() {
         )
         .map((h) => ({
           id: h.id,
-          title: h.room_name || h.video_path || "تماشا",
+          title: h.room_name || h.video_path || t("dashboard.watchFallback"),
           progress:
             h.duration > 0
-              ? `${Math.round((h.last_position / h.duration) * 100)}٪`
-              : "—",
+              ? t("dashboard.percentWatched", {
+                  percent: Math.round((h.last_position / h.duration) * 100),
+                })
+              : t("common.dash"),
           status: formatFaDate(h.watched_at),
         }));
     }
@@ -64,7 +71,7 @@ export default function LibraryPage() {
         .map((s) => ({
           id: s.id,
           title: s.title,
-          progress: s.is_played ? "پخش‌شده" : "زمان‌بندی",
+          progress: s.is_played ? t("dashboard.watched") : t("dashboard.schedule"),
           status: formatFaDate(s.scheduled_for),
         }));
     }
@@ -74,9 +81,9 @@ export default function LibraryPage() {
         id: f.room_id,
         title: f.room_name,
         progress: f.owner_name,
-        status: "عمومی",
+        status: t("dashboard.public"),
       }));
-  }, [tab, search, videosQ.data, historyQ.data, scheduleQ.data, feedQ.data]);
+  }, [tab, search, videosQ.data, historyQ.data, scheduleQ.data, feedQ.data, t]);
 
   const isLoading =
     (tab === "uploaded" && videosQ.isLoading) ||
@@ -90,18 +97,21 @@ export default function LibraryPage() {
     (tab === "watchlist" && scheduleQ.isError) ||
     (tab === "discover" && feedQ.isError);
 
+  const loadError =
+    videosQ.error ?? historyQ.error ?? scheduleQ.error ?? feedQ.error;
+
   const tabs: { key: Tab; label: string }[] = [
-    { key: "uploaded", label: "آپلودشده" },
-    { key: "watchlist", label: "زمان‌بندی" },
-    { key: "discover", label: "فید عمومی" },
-    { key: "history", label: "تاریخچه" },
+    { key: "uploaded", label: t("dashboard.uploaded") },
+    { key: "watchlist", label: t("dashboard.schedule") },
+    { key: "discover", label: t("dashboard.publicFeedTab") },
+    { key: "history", label: t("dashboard.historyTab") },
   ];
 
   return (
     <div>
       <SectionHeader
-        title="ویدیوها / کتابخانه"
-        description="ویدیوها، زمان‌بندی، فید و تاریخچه تماشا از API"
+        title={t("dashboard.libraryTitle")}
+        description={t("dashboard.libraryDesc")}
       />
 
       <div className="mb-4 flex flex-wrap gap-2 md:mb-6">
@@ -120,19 +130,34 @@ export default function LibraryPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <GlassPanel title="آپلودشده" description={`${videosQ.data?.videos.length ?? 0} ویدیو`}>
+        <GlassPanel
+          title={t("dashboard.uploaded")}
+          description={t("dashboard.videoCount", {
+            count: videosQ.data?.videos.length ?? 0,
+          })}
+        >
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <PlayCircle className="size-4" />
             GET /api/videos
           </div>
         </GlassPanel>
-        <GlassPanel title="زمان‌بندی" description={`${scheduleQ.data?.length ?? 0} مورد`}>
+        <GlassPanel
+          title={t("dashboard.schedule")}
+          description={t("dashboard.itemCount", {
+            count: scheduleQ.data?.length ?? 0,
+          })}
+        >
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <Star className="size-4" />
             GET /api/schedule
           </div>
         </GlassPanel>
-        <GlassPanel title="تاریخچه" description={`${historyQ.data?.length ?? 0} تماشا`}>
+        <GlassPanel
+          title={t("dashboard.historyTab")}
+          description={t("dashboard.watchCount", {
+            count: historyQ.data?.length ?? 0,
+          })}
+        >
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <History className="size-4" />
             GET /api/watch-history
@@ -141,15 +166,20 @@ export default function LibraryPage() {
       </div>
 
       <div className="mt-4 md:mt-6">
-        <GlassPanel title="لیست" description="فیلتر و جستجو">
+        <GlassPanel title={t("dashboard.list")} description={t("dashboard.filterSearch")}>
           <div className="mt-3">
-            <SearchField placeholder="جستجو..." value={search} onChange={setSearch} />
+            <SearchField
+              placeholder={t("dashboard.searchPlaceholder")}
+              value={search}
+              onChange={setSearch}
+            />
           </div>
           <div className="mt-3">
             {isLoading ? <DashboardSkeleton /> : null}
             {isError ? (
-              <ErrorState
-                title="خطا در دریافت داده"
+              <QueryError
+                error={loadError}
+                context="library.load"
                 onRetry={() => {
                   videosQ.refetch();
                   historyQ.refetch();
@@ -169,7 +199,7 @@ export default function LibraryPage() {
               />
             ) : null}
             {!isLoading && !isError && !filteredRows.length ? (
-              <EmptyState title="موردی نیست" />
+              <EmptyState title={t("dashboard.noItems")} />
             ) : null}
           </div>
           {tab === "uploaded" ? (
@@ -178,7 +208,7 @@ export default function LibraryPage() {
               onClick={() => setUploadOpen(true)}
               className="mt-3 rounded-xl bg-primary px-3 py-2 text-sm text-white"
             >
-              آپلود ویدیو
+              {t("dashboard.uploadVideo")}
             </button>
           ) : null}
         </GlassPanel>

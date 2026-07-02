@@ -182,6 +182,7 @@ func (h *Handler) AdminBanUser(w http.ResponseWriter, r *http.Request) {
 	action := "user_unban"
 	if req.Banned {
 		action = "user_ban"
+		_ = h.Repo.InvalidateUserSessions(r.Context(), id)
 	}
 	_ = h.Repo.WriteActivityLog(r.Context(), auditActor(r), models.RoleAdmin, action, "user", id, "")
 	user, _ := h.Repo.GetUserByID(r.Context(), id)
@@ -495,14 +496,27 @@ func (h *Handler) AdminCloseRoom(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to close room")
 		return
 	}
+	h.Hub.CloseRoom(id)
 	_ = h.Repo.WriteAuditLog(r.Context(), auditActor(r), "room_close", "room", id, "")
 	WriteJSON(w, http.StatusOK, map[string]string{"message": "Room closed"})
+}
+
+func (h *Handler) AdminDeleteRoom(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	h.Hub.CloseRoom(id)
+	if err := h.Repo.DeleteRoom(r.Context(), id); err != nil {
+		WriteJSONError(w, http.StatusInternalServerError, "Failed to delete room")
+		return
+	}
+	_ = h.Repo.WriteAuditLog(r.Context(), auditActor(r), "room_delete", "room", id, "")
+	WriteJSON(w, http.StatusOK, map[string]string{"message": "Room deleted"})
 }
 
 func (h *Handler) AdminListLogs(w http.ResponseWriter, r *http.Request) {
 	page := QueryInt(r, "page", 1)
 	limit := QueryInt(r, "limit", 30)
-	result, err := h.Repo.ListAuditLogsPaginated(r.Context(), page, limit)
+	role := r.URL.Query().Get("role")
+	result, err := h.Repo.ListAuditLogsPaginated(r.Context(), page, limit, role)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to list logs")
 		return
@@ -529,6 +543,7 @@ func (h *Handler) AdminResetUserPassword(w http.ResponseWriter, r *http.Request)
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to reset password")
 		return
 	}
+	_ = h.Repo.InvalidateUserSessions(r.Context(), id)
 	_ = h.Repo.WriteAuditLog(r.Context(), auditActor(r), "user_reset_password", "user", id, "")
 	WriteJSON(w, http.StatusOK, map[string]string{"message": "Password reset"})
 }

@@ -10,17 +10,19 @@ import (
 
 	"watch-party/internal/models"
 	"watch-party/internal/phone"
+	"watch-party/internal/ratelimit"
 	"watch-party/internal/repository"
 )
 
 // Handler serves phone OTP authentication HTTP endpoints.
 type Handler struct {
-	Repo *repository.Repository
-	JWT  *JWT
+	Repo       *repository.Repository
+	JWT        *JWT
+	OTPLimiter *ratelimit.Limiter
 }
 
-func NewHandler(repo *repository.Repository, jwt *JWT) *Handler {
-	return &Handler{Repo: repo, JWT: jwt}
+func NewHandler(repo *repository.Repository, jwt *JWT, otpLimiter *ratelimit.Limiter) *Handler {
+	return &Handler{Repo: repo, JWT: jwt, OTPLimiter: otpLimiter}
 }
 
 type phoneRequest struct {
@@ -72,6 +74,11 @@ func (h *Handler) RequestOTP(w http.ResponseWriter, r *http.Request) {
 	normalized := phone.Normalize(req.PhoneNumber)
 	if !phone.Valid(normalized) {
 		writeError(w, http.StatusBadRequest, "Invalid phone number format (use 09XXXXXXXXX)")
+		return
+	}
+
+	if h.OTPLimiter != nil && !h.OTPLimiter.Allow(normalized) {
+		writeError(w, http.StatusTooManyRequests, "Too many OTP requests for this number — try again later")
 		return
 	}
 
@@ -153,7 +160,12 @@ func (h *Handler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = h.Repo.TouchLastLogin(r.Context(), user.ID.Hex())
-	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role)
+	if isNew {
+		_ = h.Repo.WriteActivityLog(r.Context(), user.ID.Hex(), user.Role, "user_register", "user", user.ID.Hex(), "otp")
+	} else {
+		_ = h.Repo.WriteActivityLog(r.Context(), user.ID.Hex(), user.Role, "login", "user", user.ID.Hex(), "otp")
+	}
+	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role, user.TokenVersion)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create token")
 		return

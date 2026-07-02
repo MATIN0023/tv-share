@@ -11,8 +11,10 @@ import {
   useSetMaintenanceMode,
   useUpdateAdminSettings,
 } from "@/hooks/use-admin";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export default function AdminSettingsPage() {
+  const { t } = useTranslation();
   const settingsQ = useAdminSettings();
   const updateMut = useUpdateAdminSettings();
   const maintenanceMut = useSetMaintenanceMode();
@@ -46,15 +48,15 @@ export default function AdminSettingsPage() {
   return (
     <div>
       <AdminSectionHeader
-        title="تنظیمات سیستم"
-        description="کنترل دسترسی، پرداخت، اعلان‌ها و رفتار کلی پلتفرم"
+        title={t("adminPages.settingsTitle")}
+        description={t("adminPages.settingsDesc")}
       />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <AdminPanel title="اطلاعات عمومی">
+        <AdminPanel title={t("adminPages.generalInfo")}>
           <div className="space-y-3">
             <div>
-              <label className="text-xs text-zinc-500">نام سایت</label>
+              <label className="text-xs text-zinc-500">{t("adminPages.siteName")}</label>
               <Input
                 className="mt-1 border-zinc-700 bg-zinc-950"
                 value={siteName}
@@ -62,7 +64,7 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">ایمیل پشتیبانی</label>
+              <label className="text-xs text-zinc-500">{t("adminPages.supportEmail")}</label>
               <Input
                 className="mt-1 border-zinc-700 bg-zinc-950"
                 dir="ltr"
@@ -71,7 +73,7 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">تلفن پشتیبانی</label>
+              <label className="text-xs text-zinc-500">{t("adminPages.supportPhone")}</label>
               <Input
                 className="mt-1 border-zinc-700 bg-zinc-950"
                 dir="ltr"
@@ -80,7 +82,7 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">اعلان سراسری (نمایش در داشبورد)</label>
+              <label className="text-xs text-zinc-500">{t("adminPages.globalNotice")}</label>
               <textarea
                 className="mt-1 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
                 rows={3}
@@ -89,7 +91,7 @@ export default function AdminSettingsPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-500">حداکثر حجم آپلود (مگابایت)</label>
+              <label className="text-xs text-zinc-500">{t("adminPages.maxUploadMb")}</label>
               <Input
                 type="number"
                 className="mt-1 border-zinc-700 bg-zinc-950"
@@ -111,47 +113,47 @@ export default function AdminSettingsPage() {
               }
               className="rounded-lg bg-amber-500 px-4 py-2 text-sm text-zinc-950 disabled:opacity-50"
             >
-              ذخیره تنظیمات عمومی
+              {t("adminPages.saveGeneralSettings")}
             </button>
           </div>
         </AdminPanel>
 
-        <AdminPanel title="دسترسی و سرویس‌ها">
+        <AdminPanel title={t("adminPages.accessServices")}>
           <div className="space-y-3 text-sm">
             <ToggleSwitch
-              label="ورود کاربران"
-              description="غیرفعال = هیچ کس نمی‌تواند وارد شود"
+              label={t("adminPages.userLogin")}
+              description={t("adminPages.loginDisabledHint")}
               checked={s?.login_enabled ?? true}
               disabled={updateMut.isPending}
               onChange={(v) => updateMut.mutate({ login_enabled: v })}
             />
             <ToggleSwitch
-              label="ثبت‌نام جدید"
+              label={t("adminPages.newSignup")}
               checked={s?.signup_enabled ?? true}
               disabled={updateMut.isPending}
               onChange={(v) => updateMut.mutate({ signup_enabled: v })}
             />
             <ToggleSwitch
-              label="پرداخت آنلاین"
+              label={t("adminPages.onlinePayment")}
               checked={s?.payment_enabled ?? true}
               disabled={updateMut.isPending}
               onChange={(v) => updateMut.mutate({ payment_enabled: v })}
             />
             <ToggleSwitch
-              label="ورود با OTP"
+              label={t("adminPages.otpLogin")}
               checked={s?.otp_enabled ?? true}
               disabled={updateMut.isPending}
               onChange={(v) => updateMut.mutate({ otp_enabled: v })}
             />
             <ToggleSwitch
-              label="اتاق مهمان"
+              label={t("adminPages.guestRoom")}
               checked={s?.allow_guest_rooms ?? true}
               disabled={updateMut.isPending}
               onChange={(v) => updateMut.mutate({ allow_guest_rooms: v })}
             />
             <ToggleSwitch
-              label="حالت تعمیرات"
-              description="فقط مدیران به API دسترسی دارند"
+              label={t("adminPages.maintenanceMode")}
+              description={t("adminPages.adminOnlyApi")}
               danger
               checked={s?.maintenance_mode ?? false}
               disabled={maintenanceMut.isPending}
@@ -164,14 +166,18 @@ export default function AdminSettingsPage() {
       <AdminConfirmDialog
         open={maintenanceConfirm}
         onClose={() => setMaintenanceConfirm(false)}
-        title={pendingMaintenance ? "فعال‌سازی حالت تعمیرات" : "خروج از حالت تعمیرات"}
+        title={
+          pendingMaintenance
+            ? t("adminPages.enableMaintenance")
+            : t("adminPages.disableMaintenance")
+        }
         description={
           pendingMaintenance
-            ? "کاربران عادی نمی‌توانند از سرویس استفاده کنند. ادامه می‌دهید؟"
-            : "سرویس برای همه کاربران باز می‌شود."
+            ? t("adminPages.maintenanceConfirm")
+            : t("adminPages.maintenanceDisableConfirm")
         }
         variant={pendingMaintenance ? "danger" : "primary"}
-        confirmLabel="تأیید"
+        confirmLabel={t("common.confirm")}
         onConfirm={async () => {
           await maintenanceMut.mutateAsync(pendingMaintenance);
         }}

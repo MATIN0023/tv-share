@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface PaginationBarProps {
   page: number;
@@ -12,6 +13,7 @@ export function PaginationBar({ page, totalPages, total }: PaginationBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { t } = useTranslation();
 
   const go = (next: number) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -21,7 +23,7 @@ export function PaginationBar({ page, totalPages, total }: PaginationBarProps) {
 
   return (
     <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-sm text-zinc-500">
-      <span>مجموع: {total.toLocaleString("fa-IR")}</span>
+      <span>{t("pagination.total", { total: total.toLocaleString() })}</span>
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -29,10 +31,10 @@ export function PaginationBar({ page, totalPages, total }: PaginationBarProps) {
           onClick={() => go(page - 1)}
           className="rounded border border-zinc-700 px-3 py-1 disabled:opacity-40"
         >
-          قبلی
+          {t("pagination.prev")}
         </button>
         <span>
-          {page.toLocaleString("fa-IR")} / {totalPages.toLocaleString("fa-IR")}
+          {page.toLocaleString()} / {totalPages.toLocaleString()}
         </span>
         <button
           type="button"
@@ -40,7 +42,7 @@ export function PaginationBar({ page, totalPages, total }: PaginationBarProps) {
           onClick={() => go(page + 1)}
           className="rounded border border-zinc-700 px-3 py-1 disabled:opacity-40"
         >
-          بعدی
+          {t("pagination.next")}
         </button>
       </div>
     </div>

@@ -1,17 +1,12 @@
-// app/(main)/layout.tsx
-import { Navbar } from "@/components/Navbar";
-import { Footer } from "@/components/Footer";
+import { LandingNavbar } from "@/components/landing/landing-navbar";
+import { LandingFooter } from "@/components/landing/landing-footer";
 
-export default function MainLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
-      <Navbar />
+    <div className="min-h-screen bg-zinc-950 text-white">
+      <LandingNavbar />
       {children}
-      <Footer />
-    </>
+      <LandingFooter />
+    </div>
   );
 }

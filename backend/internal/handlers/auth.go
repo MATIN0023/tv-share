@@ -8,6 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"watch-party/internal/auth"
+	"watch-party/internal/models"
 	"watch-party/internal/phone"
 )
 
@@ -60,8 +61,9 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), user.ID.Hex(), user.Role, "user_register", "user", user.ID.Hex(), "password")
 
-	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role)
+	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role, user.TokenVersion)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create token")
 		return
@@ -76,10 +78,6 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	if !h.Repo.IsSettingsFlagEnabled(r.Context(), "login_enabled", true) {
-		WriteJSONError(w, http.StatusForbidden, "ورود موقتاً غیرفعال است")
-		return
-	}
 	var req loginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
@@ -105,10 +103,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = h.Repo.TouchLastLogin(r.Context(), user.ID.Hex())
-	_ = h.Repo.WriteActivityLog(r.Context(), user.ID.Hex(), user.Role, "login", "user", user.ID.Hex(), "")
+	if !h.Repo.IsSettingsFlagEnabled(r.Context(), "login_enabled", true) && !models.IsAdminRole(user.Role) {
+		WriteJSONError(w, http.StatusForbidden, "ورود موقتاً غیرفعال است — فقط مدیران می‌توانند وارد شوند")
+		return
+	}
 
-	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role)
+	_ = h.Repo.TouchLastLogin(r.Context(), user.ID.Hex())
+	_ = h.Repo.WriteActivityLog(r.Context(), user.ID.Hex(), user.Role, "login", "user", user.ID.Hex(), "password")
+
+	token, err := h.JWT.Generate(user.ID.Hex(), user.PhoneNumber, user.Role, user.TokenVersion)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create token")
 		return
@@ -125,4 +128,23 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 
 func userID(r *http.Request) string {
 	return auth.UserIDFromContext(r.Context())
+}
+
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	uid := userID(r)
+	if uid == "" {
+		WriteJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	user, err := h.Repo.GetUserByID(r.Context(), uid)
+	if err != nil {
+		WriteJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+	if err := h.Repo.InvalidateUserSessions(r.Context(), uid); err != nil {
+		WriteJSONError(w, http.StatusInternalServerError, "Failed to logout")
+		return
+	}
+	_ = h.Repo.WriteActivityLog(r.Context(), uid, user.Role, "logout", "user", uid, "")
+	WriteJSON(w, http.StatusOK, map[string]string{"message": "Logged out"})
 }

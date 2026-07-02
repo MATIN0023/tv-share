@@ -1,28 +1,79 @@
 // components/Features.tsx (نسخه پیشرفته)
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import { BentoGrid, BentoGridItem } from "@/components/ui/bento-grid";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export function Features() {
+  const { t } = useTranslation();
+
+  const items = useMemo(
+    () => [
+      {
+        title: t("landing.bentoGroupWatch"),
+        description: t("landing.bentoGroupWatchDesc"),
+        header: <WatchTogetherHeader />,
+        icon: <span className="text-2xl">👥</span>,
+      },
+      {
+        title: t("landing.bentoQuality"),
+        description: t("landing.bentoQualityDesc"),
+        header: <QualityHeader />,
+        icon: <span className="text-2xl">📺</span>,
+      },
+      {
+        title: t("landing.bentoChat"),
+        description: t("landing.bentoChatDesc"),
+        header: <ChatHeader />,
+        icon: <span className="text-2xl">💬</span>,
+      },
+      {
+        title: t("landing.bentoFavorites"),
+        description: t("landing.bentoFavoritesDesc"),
+        header: <FavoriteHeader />,
+        icon: <span className="text-2xl">❤️</span>,
+      },
+      {
+        title: t("landing.bentoRating"),
+        description: t("landing.bentoRatingDesc"),
+        header: <RatingHeader />,
+        icon: <span className="text-2xl">⭐</span>,
+      },
+      {
+        title: t("landing.bentoDownload"),
+        description: t("landing.bentoDownloadDesc"),
+        header: <DownloadHeader />,
+        icon: <span className="text-2xl">⬇️</span>,
+      },
+      {
+        title: t("landing.bentoSecurity"),
+        description: t("landing.bentoSecurityDesc"),
+        header: <SecurityHeader />,
+        icon: <span className="text-2xl">🛡️</span>,
+      },
+    ],
+    [t]
+  );
+
   return (
-    <div className="py-20 px-4 bg-gradient-to-b from-white to-gray-50 dark:from-black dark:to-zinc-900">
-      <div className="max-w-7xl mx-auto">
+    <div className="bg-zinc-950 px-4 py-20">
+      <div className="mx-auto max-w-7xl">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           viewport={{ once: true }}
-          className="text-center mb-16"
+          className="mb-16 text-center"
         >
-          <h2 className="text-4xl md:text-6xl font-bold text-black dark:text-white mb-4">
-            چرا{" "}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-red-500">
-              ما رو انتخاب کنی؟
+          <h2 className="mb-4 text-4xl font-bold text-white md:text-6xl">
+            {t("landing.featuresTitle")}{" "}
+            <span className="bg-gradient-to-r from-violet-400 via-purple-300 to-fuchsia-400 bg-clip-text text-transparent">
+              {t("landing.featuresHighlight")}
             </span>
           </h2>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            بهترین تجربه تماشای آنلاین با امکانات منحصر به فرد
+          <p className="mx-auto max-w-2xl text-lg text-white/50">
+            {t("landing.featuresSubtitle")}
           </p>
         </motion.div>
 
@@ -43,7 +94,6 @@ export function Features() {
   );
 }
 
-// Header Components با انیمیشن
 const WatchTogetherHeader = () => (
   <div className="flex flex-1 w-full h-full min-h-[6rem] rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 relative overflow-hidden">
     <motion.div
@@ -158,50 +208,3 @@ const SecurityHeader = () => (
     </motion.div>
   </div>
 );
-
-const items = [
-  {
-    title: "تماشای گروهی",
-    description: "تا ۱۰ نفر همزمان با دوستات فیلم ببین",
-    header: <WatchTogetherHeader />,
-    icon: <span className="text-2xl">👥</span>,
-  },
-  {
-    title: "کیفیت ۴K",
-    description: "تجربه تماشا با بالاترین کیفیت ممکن",
-    header: <QualityHeader />,
-    icon: <span className="text-2xl">📺</span>,
-  },
-  {
-    title: "چت زنده",
-    description: "گفتگو و واکنش لحظه‌ای در حین تماشا",
-    header: <ChatHeader />,
-    icon: <span className="text-2xl">💬</span>,
-  },
-  {
-    title: "لیست علاقه‌مندی‌ها",
-    description:
-      "فیلم‌ها و سریال‌های مورد علاقت رو ذخیره کن و بعداً تماشا کن",
-    header: <FavoriteHeader />,
-    icon: <span className="text-2xl">❤️</span>,
-  },
-  {
-    title: "امتیازدهی و نظرات",
-    description: "نظرت رو با دیگران به اشتراک بذار",
-    header: <RatingHeader />,
-    icon: <span className="text-2xl">⭐</span>,
-  },
-  {
-    title: "دانلود آفلاین",
-    description: "فیلم‌ها رو دانلود کن و بدون اینترنت تماشا کن",
-    header: <DownloadHeader />,
-    icon: <span className="text-2xl">⬇️</span>,
-  },
-  {
-    title: "امنیت بالا",
-    description:
-      "اطلاعات شخصی و پرداخت‌های شما با بالاترین استانداردهای امنیتی محافظت می‌شود",
-    header: <SecurityHeader />,
-    icon: <span className="text-2xl">🛡️</span>,
-  },
-];

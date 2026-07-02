@@ -1,0 +1,11 @@
+# Local environment
+.env
+!.env.example
+
+# Compiled binaries
+*.exe
+bin/
+
+# Test / coverage
+coverage.out
+coverage.html

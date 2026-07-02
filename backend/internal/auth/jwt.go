@@ -15,9 +15,10 @@ const UserIDKey contextKey = "userID"
 const RoleKey contextKey = "role"
 
 type Claims struct {
-	UserID      string `json:"user_id"`
-	PhoneNumber string `json:"phone_number"`
-	Role        string `json:"role"`
+	UserID       string `json:"user_id"`
+	PhoneNumber  string `json:"phone_number"`
+	Role         string `json:"role"`
+	TokenVersion int    `json:"tv"`
 	jwt.RegisteredClaims
 }
 
@@ -29,11 +30,12 @@ func NewJWT(secret []byte) *JWT {
 	return &JWT{secret: secret}
 }
 
-func (j *JWT) Generate(userID, phoneNumber, role string) (string, error) {
+func (j *JWT) Generate(userID, phoneNumber, role string, tokenVersion int) (string, error) {
 	claims := Claims{
-		UserID:      userID,
-		PhoneNumber: phoneNumber,
-		Role:        role,
+		UserID:       userID,
+		PhoneNumber:  phoneNumber,
+		Role:         role,
+		TokenVersion: tokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

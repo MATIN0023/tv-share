@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslation } from "@/providers/i18n-provider";
+
 export type NotificationType = "room_invite" | "friend_request" | "system";
 
 export interface NotificationRow {
@@ -9,28 +13,30 @@ export interface NotificationRow {
   read: boolean;
 }
 
-const typeLabel: Record<NotificationType, string> = {
-  room_invite: "دعوت به اتاق",
-  friend_request: "درخواست دوستی",
-  system: "پیام سیستم",
-};
-
 interface NotificationsTableProps {
   rows: NotificationRow[];
   onMarkRead?: (id: string) => void;
 }
 
 export function NotificationsTable({ rows, onMarkRead }: NotificationsTableProps) {
+  const { t } = useTranslation();
+
+  const typeLabel: Record<NotificationType, string> = {
+    room_invite: t("tables.roomInvite"),
+    friend_request: t("tables.friendRequest"),
+    system: t("tables.systemMessage"),
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10">
       <table className="w-full text-sm">
         <thead className="bg-white/5 text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 text-right">نوع</th>
-            <th className="px-3 py-2 text-right">عنوان</th>
-            <th className="px-3 py-2 text-right">زمان</th>
-            <th className="px-3 py-2 text-right">وضعیت</th>
-            <th className="px-3 py-2 text-right">عملیات</th>
+            <th className="px-3 py-2 text-right">{t("tables.type")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.title")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.time")}</th>
+            <th className="px-3 py-2 text-right">{t("common.status")}</th>
+            <th className="px-3 py-2 text-right">{t("common.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -45,7 +51,9 @@ export function NotificationsTable({ rows, onMarkRead }: NotificationsTableProps
                 <p className="text-xs text-muted-foreground">{row.body}</p>
               </td>
               <td className="px-3 py-2 text-muted-foreground">{row.createdAt}</td>
-              <td className="px-3 py-2">{row.read ? "خوانده‌شده" : "جدید"}</td>
+              <td className="px-3 py-2">
+                {row.read ? t("tables.read") : t("dashboard.new")}
+              </td>
               <td className="px-3 py-2">
                 {!row.read && onMarkRead ? (
                   <button
@@ -53,10 +61,10 @@ export function NotificationsTable({ rows, onMarkRead }: NotificationsTableProps
                     onClick={() => onMarkRead(row.id)}
                     className="text-xs text-primary"
                   >
-                    علامت‌گذاری خوانده
+                    {t("tables.markRead")}
                   </button>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs text-muted-foreground">{t("common.dash")}</span>
                 )}
               </td>
             </tr>

@@ -1,15 +1,21 @@
+"use client";
+
+import { useTranslation } from "@/providers/i18n-provider";
+
 interface FriendCardProps {
   name: string;
   status: "online" | "watching" | "away";
 }
 
-const statusLabel: Record<FriendCardProps["status"], string> = {
-  online: "آنلاین",
-  watching: "در حال تماشا",
-  away: "دور از دسترس",
-};
-
 export function FriendCard({ name, status }: FriendCardProps) {
+  const { t } = useTranslation();
+
+  const statusLabel: Record<FriendCardProps["status"], string> = {
+    online: t("cards.online"),
+    watching: t("cards.watching"),
+    away: t("cards.away"),
+  };
+
   return (
     <div className="rounded-xl border border-white/10 p-3">
       <p className="font-medium">{name}</p>

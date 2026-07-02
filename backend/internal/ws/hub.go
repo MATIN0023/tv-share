@@ -112,16 +112,41 @@ func (h *Hub) BroadcastRoomState(roomID string) {
 	if !ok {
 		return
 	}
-	room, err := h.repo.GetRoom(context.Background(), roomID)
-	if err == nil {
-		state.Room = *room
+	room := state.Room
+	if fresh, err := h.repo.GetRoom(context.Background(), roomID); err == nil {
+		state.Room = *fresh
+		room = *fresh
 	}
-	h.broadcast <- &Message{Type: "room_state", RoomInfo: &state.Room}
+	h.broadcast <- &Message{
+		Type:        "room_state",
+		RoomID:      roomID,
+		IsPlaying:   room.IsPlaying,
+		CurrentTime: room.CurrentTime,
+		Duration:    room.Duration,
+		RoomInfo:    &state.Room,
+	}
 }
 
 func (h *Hub) BroadcastToRoom(roomID string, msg *Message) {
 	msg.RoomID = roomID
 	h.broadcast <- msg
+}
+
+// CloseRoom disconnects all clients and removes the room from the hub.
+func (h *Hub) CloseRoom(roomID string) {
+	state, ok := h.rooms[roomID]
+	if !ok {
+		return
+	}
+	msg := &Message{Type: "room_closed", Text: "Room closed by administrator", RoomID: roomID}
+	for client := range state.Clients {
+		select {
+		case client.send <- msg:
+		default:
+		}
+		_ = client.conn.Close()
+	}
+	delete(h.rooms, roomID)
 }
 
 func (h *Hub) RoomExists(roomID string) bool {

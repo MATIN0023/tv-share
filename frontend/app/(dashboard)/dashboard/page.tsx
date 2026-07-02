@@ -12,7 +12,6 @@ import { LiveRoomCard } from "@/components/dashboard/cards/live-room-card";
 import { CreateRoomModal } from "@/components/dashboard/modals/create-room-modal";
 import { UploadVideoModal } from "@/components/dashboard/modals/upload-video-modal";
 import { ConfirmActionModal } from "@/components/dashboard/modals/confirm-action-modal";
-import { Input } from "@/components/ui/input";
 import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
 import { useFeed, useWatchHistory } from "@/hooks/use-feed";
 import { useFriends, useSendFriendRequest, useUsers } from "@/hooks/use-friends";
@@ -22,8 +21,10 @@ import { useCreateRoom, useRooms } from "@/hooks/use-rooms";
 import { useUploadVideo, useVideos } from "@/hooks/use-videos";
 import { formatFaNumber } from "@/lib/utils/format-date";
 import { toast } from "@/lib/toast";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const [createRoomOpen, setCreateRoomOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -52,29 +53,31 @@ export default function DashboardPage() {
   const stats = useMemo(
     () => [
       {
-        title: "اتاق‌های فعال",
+        title: t("dashboard.activeRooms"),
         value: formatFaNumber(activeRooms),
-        change: `${formatFaNumber(roomsQ.data?.length ?? 0)} اتاق کل`,
+        change: t("dashboard.totalRooms", {
+          count: formatFaNumber(roomsQ.data?.length ?? 0),
+        }),
         icon: Users,
       },
       {
-        title: "دوستان",
+        title: t("dashboard.friendsStat"),
         value: formatFaNumber(friendsQ.data?.friends.length ?? 0),
-        change: "لیست دوستان",
+        change: t("dashboard.friendsListHint"),
         icon: Clock3,
       },
       {
-        title: "ویدیوها",
+        title: t("dashboard.videosStat"),
         value: formatFaNumber(videosQ.data?.videos.length ?? 0),
-        change: "کتابخانه شخصی",
+        change: t("dashboard.personalLibrary"),
         icon: Film,
       },
     ],
-    [activeRooms, roomsQ.data, friendsQ.data, videosQ.data]
+    [activeRooms, roomsQ.data, friendsQ.data, videosQ.data, t]
   );
 
   const continueWatching = (historyQ.data ?? []).slice(0, 2).map((h) => ({
-    title: h.room_name || "تماشا",
+    title: h.room_name || t("dashboard.watchFallback"),
     progress:
       h.duration > 0 ? Math.round((h.last_position / h.duration) * 100) : 0,
   }));
@@ -95,11 +98,11 @@ export default function DashboardPage() {
   return (
     <div>
       <SectionHeader
-        title="نمای کلی"
+        title={t("dashboard.overviewTitle")}
         description={
           settings?.site_name
-            ? `خوش آمدید به ${settings.site_name}`
-            : "آمار اتاق‌ها، دوستان و ویدیوهای شما"
+            ? t("dashboard.welcomeTo", { name: settings.site_name })
+            : t("dashboard.overviewDesc")
         }
       />
 
@@ -116,7 +119,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <GlassPanel title="ادامه تماشا" className="xl:col-span-2">
+        <GlassPanel title={t("dashboard.continueWatching")} className="xl:col-span-2">
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {continueWatching.length ? (
               continueWatching.map((c) => (
@@ -127,12 +130,12 @@ export default function DashboardPage() {
                 />
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">تاریخچه‌ای ثبت نشده</p>
+              <p className="text-sm text-muted-foreground">{t("dashboard.noHistory")}</p>
             )}
           </div>
         </GlassPanel>
 
-        <GlassPanel title="اقدام سریع">
+        <GlassPanel title={t("dashboard.quickAction")}>
           <div className="mt-3 space-y-2">
             <button
               type="button"
@@ -140,14 +143,14 @@ export default function DashboardPage() {
               onClick={() => setCreateRoomOpen(true)}
               className="w-full rounded-xl border border-white/20 px-3 py-2 text-sm disabled:opacity-40"
             >
-              ساخت اتاق تماشا
+              {t("dashboard.createWatchRoom")}
             </button>
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
               className="w-full rounded-xl border border-white/20 px-3 py-2 text-sm"
             >
-              درخواست دوستی
+              {t("dashboard.friendRequest")}
             </button>
             <button
               type="button"
@@ -156,11 +159,11 @@ export default function DashboardPage() {
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm text-white disabled:opacity-40"
             >
               <Video className="size-4" />
-              آپلود ویدیو
+              {t("dashboard.uploadVideo")}
             </button>
             {!canCreateRoom || !canUpload ? (
               <p className="text-xs text-amber-400">
-                برخی اقدامات به‌دلیل حالت تعمیرات غیرفعال شده‌اند.
+                {t("dashboard.maintenanceActionsDisabled")}
               </p>
             ) : null}
           </div>
@@ -168,7 +171,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2 md:mt-6">
-        <GlassPanel title="فید عمومی">
+        <GlassPanel title={t("dashboard.publicFeed")}>
           <div className="mt-3 space-y-2">
             {liveFeed.length ? (
               liveFeed.map((f) => (
@@ -176,15 +179,15 @@ export default function DashboardPage() {
                   key={f.room_id}
                   roomName={f.room_name}
                   friendName={f.owner_name}
-                  viewers="—"
+                  viewers={t("common.dash")}
                 />
               ))
             ) : (
-              <p className="text-sm text-muted-foreground">اتاق عمومی فعالی نیست</p>
+              <p className="text-sm text-muted-foreground">{t("dashboard.noPublicRooms")}</p>
             )}
           </div>
         </GlassPanel>
-        <GlassPanel title="اعلان‌های اخیر">
+        <GlassPanel title={t("dashboard.recentNotifications")}>
           <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
             {activities.length ? (
               activities.map((activity) => (
@@ -194,7 +197,7 @@ export default function DashboardPage() {
               ))
             ) : (
               <li className="rounded-xl border border-white/10 px-3 py-2">
-                اعلانی نیست
+                {t("dashboard.noNotificationsShort")}
               </li>
             )}
           </ul>
@@ -225,25 +228,25 @@ export default function DashboardPage() {
       <ConfirmActionModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        title="درخواست دوستی"
-        description="کاربری را از لیست انتخاب کنید"
-        confirmLabel="ارسال"
+        title={t("dashboard.friendRequest")}
+        description={t("dashboard.userSelectHint")}
+        confirmLabel={t("dashboard.send")}
         onConfirm={() => {
           if (!inviteUserId.trim()) {
-            toast.error("لطفاً یک کاربر انتخاب کنید");
+            toast.error(t("dashboard.selectUser"));
             return;
           }
           sendFriend.mutate(inviteUserId.trim());
           setInviteOpen(false);
         }}
       >
-        <LabeledField label="کاربر" hint="از بین کاربران ثبت‌شده در سامانه">
+        <LabeledField label={t("dashboard.userLabel")} hint={t("dashboard.userSelectHint")}>
           <select
             className="mt-2 w-full rounded-xl border border-white/20 bg-transparent px-3 py-2 text-sm"
             value={inviteUserId}
             onChange={(e) => setInviteUserId(e.target.value)}
           >
-            <option value="">— انتخاب کنید —</option>
+            <option value="">{t("dashboard.selectPlaceholder")}</option>
             {users.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.display_name ?? u.phone_number}

@@ -8,15 +8,11 @@ import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
 import { PaginationBar } from "@/components/admin/pagination-bar";
 import { useAdminReports, useResolveAdminReport } from "@/hooks/use-admin";
 import { formatFaDate } from "@/lib/utils/format-date";
-
-const TARGET_LABELS: Record<string, string> = {
-  user: "کاربر",
-  room: "اتاق",
-  video: "ویدیو",
-  message: "پیام",
-};
+import { targetTypeLabel } from "@/lib/activity-labels";
+import { useTranslation } from "@/providers/i18n-provider";
 
 function ReportsContent() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const page = Number(searchParams.get("page") || "1");
@@ -31,6 +27,9 @@ function ReportsContent() {
   const total = reportsQ.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / 15));
 
+  const statusLabel = (s: string) =>
+    s === "open" ? t("dashboard.open") : t("adminPages.resolved");
+
   const setFilter = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
@@ -42,8 +41,8 @@ function ReportsContent() {
   return (
     <div>
       <AdminSectionHeader
-        title="گزارش‌ها و تخلفات"
-        description="بررسی گزارش‌های کاربران و رسیدگی به تخلفات"
+        title={t("adminPages.reportsTitle")}
+        description={t("adminPages.reportsDesc")}
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -56,19 +55,19 @@ function ReportsContent() {
               status === s ? "border-amber-500 text-amber-500" : "border-zinc-700"
             }`}
           >
-            {s === "" ? "همه" : s === "open" ? "باز" : "رسیدگی‌شده"}
+            {s === "" ? t("common.all") : statusLabel(s)}
           </button>
         ))}
-        {["", "user", "room", "video", "message"].map((t) => (
+        {["", "user", "room", "video", "message"].map((type) => (
           <button
-            key={t || "all-type"}
+            key={type || "all-type"}
             type="button"
-            onClick={() => setFilter("target_type", t)}
+            onClick={() => setFilter("target_type", type)}
             className={`rounded-lg border px-3 py-1.5 text-sm ${
-              targetType === t ? "border-sky-500 text-sky-400" : "border-zinc-700"
+              targetType === type ? "border-sky-500 text-sky-400" : "border-zinc-700"
             }`}
           >
-            {t === "" ? "همه انواع" : TARGET_LABELS[t]}
+            {type === "" ? t("adminPages.allTypes") : targetTypeLabel(t, type)}
           </button>
         ))}
       </div>
@@ -78,23 +77,23 @@ function ReportsContent() {
           <table className="w-full min-w-[800px] text-sm">
             <thead className="text-zinc-500">
               <tr>
-                <th className="py-2 text-right">نوع</th>
-                <th className="py-2 text-right">شناسه هدف</th>
-                <th className="py-2 text-right">دلیل</th>
-                <th className="py-2 text-right">وضعیت</th>
-                <th className="py-2 text-right">تاریخ</th>
-                <th className="py-2 text-right">عملیات</th>
+                <th className="py-2 text-right">{t("tables.type")}</th>
+                <th className="py-2 text-right">{t("adminPages.targetId")}</th>
+                <th className="py-2 text-right">{t("adminPages.reason")}</th>
+                <th className="py-2 text-right">{t("common.status")}</th>
+                <th className="py-2 text-right">{t("common.date")}</th>
+                <th className="py-2 text-right">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {reports.map((r) => (
                 <tr key={r.id} className="border-t border-zinc-800">
-                  <td className="py-2">{TARGET_LABELS[r.target_type] ?? r.target_type}</td>
+                  <td className="py-2">{targetTypeLabel(t, r.target_type)}</td>
                   <td className="py-2 font-mono text-xs" dir="ltr">
                     {r.target_id}
                   </td>
                   <td className="py-2 text-amber-500/90">{r.reason}</td>
-                  <td className="py-2">{r.status === "open" ? "باز" : "رسیدگی‌شده"}</td>
+                  <td className="py-2">{statusLabel(r.status)}</td>
                   <td className="py-2 text-xs text-zinc-500">{formatFaDate(r.created_at)}</td>
                   <td className="py-2">
                     {r.status !== "resolved" ? (
@@ -103,10 +102,10 @@ function ReportsContent() {
                         onClick={() => setResolveId(r.id)}
                         className="rounded border border-emerald-800 px-2 py-1 text-emerald-400"
                       >
-                        رسیدگی
+                        {t("adminPages.resolve")}
                       </button>
                     ) : (
-                      "—"
+                      t("common.dash")
                     )}
                   </td>
                 </tr>
@@ -114,9 +113,7 @@ function ReportsContent() {
             </tbody>
           </table>
           {!reports.length ? (
-            <p className="py-8 text-center text-zinc-500">
-              گزارشی ثبت نشده. کاربران می‌توانند از بخش پشتیبانی گزارش ارسال کنند.
-            </p>
+            <p className="py-8 text-center text-zinc-500">{t("adminPages.noReports")}</p>
           ) : null}
         </div>
         <PaginationBar page={page} totalPages={totalPages} total={total} />
@@ -125,9 +122,9 @@ function ReportsContent() {
       <AdminConfirmDialog
         open={!!resolveId}
         onClose={() => setResolveId(null)}
-        title="رسیدگی به گزارش"
-        description="این گزارش به‌عنوان رسیدگی‌شده علامت‌گذاری می‌شود."
-        confirmLabel="تأیید رسیدگی"
+        title={t("adminPages.resolveReport")}
+        description={t("adminPages.resolveReportDesc")}
+        confirmLabel={t("adminPages.confirmResolve")}
         onConfirm={async () => {
           if (resolveId) await resolveMut.mutateAsync(resolveId);
         }}

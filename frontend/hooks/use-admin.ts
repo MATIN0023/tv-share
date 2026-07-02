@@ -18,6 +18,7 @@ import {
   listAdminPlans,
   listAdminReports,
   listAdminRooms,
+  listAdminTickets,
   listAdminTransactions,
   listAdminUsers,
   listLiveRooms,
@@ -29,15 +30,22 @@ import {
   updateAdminPlan,
   updateAdminSettings,
   updateAdminUser,
+  adminReplyTicket,
+  adminUpdateTicketStatus,
+  getAdminTicket,
+  exportAdminRoomChat,
+  deleteAdminRoom,
 } from "@/lib/api";
-import { toast, getErrorMessage } from "@/lib/toast";
+import { toast, showAppError } from "@/lib/toast";
+import type { ErrorContextKey } from "@/lib/errors";
+import { useTranslation } from "@/providers/i18n-provider";
 
 function onMutateSuccess(message: string) {
   return () => toast.success(message);
 }
 
-function onMutateError(fallback: string) {
-  return (err: unknown) => toast.error(getErrorMessage(err, fallback));
+function onMutateError(context: ErrorContextKey) {
+  return (err: unknown) => showAppError(err, context);
 }
 
 export function useAdminStats() {
@@ -132,27 +140,106 @@ export function useAdminDiscounts() {
   });
 }
 
-export function useAdminLogs(params?: { page?: number; limit?: number }) {
+export function useAdminLogs(params?: { page?: number; limit?: number; role?: string }) {
   return useQuery({
-    queryKey: [...queryKeys.admin.logs(), params?.page],
+    queryKey: [...queryKeys.admin.logs(), params?.page, params?.role],
     queryFn: () => listAdminLogs(params),
     enabled: typeof document !== "undefined",
   });
 }
 
+export function useAdminTickets(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}) {
+  return useQuery({
+    queryKey: [...queryKeys.admin.all, "tickets", params?.page, params?.status],
+    queryFn: () => listAdminTickets(params),
+    enabled: typeof document !== "undefined",
+  });
+}
+
+export function useAdminTicket(id: string | null) {
+  return useQuery({
+    queryKey: [...queryKeys.admin.all, "ticket", id],
+    queryFn: () => getAdminTicket(id!),
+    enabled: Boolean(id) && typeof document !== "undefined",
+  });
+}
+
+export function useAdminReplyTicket() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) =>
+      adminReplyTicket(id, body),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: [...queryKeys.admin.all, "ticket", v.id] });
+      qc.invalidateQueries({ queryKey: [...queryKeys.admin.all, "tickets"] });
+      toast.success(t("adminToast.replySent"));
+    },
+    onError: onMutateError("admin.tickets.reply"),
+  });
+}
+
+export function useAdminUpdateTicketStatus() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      adminUpdateTicketStatus(id, status),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: [...queryKeys.admin.all, "ticket", v.id] });
+      qc.invalidateQueries({ queryKey: [...queryKeys.admin.all, "tickets"] });
+      toast.success(t("adminToast.ticketStatusUpdated"));
+    },
+    onError: onMutateError("admin.tickets.status"),
+  });
+}
+
+export function useExportAdminRoomChat() {
+  return useMutation({
+    mutationFn: ({
+      id,
+      format,
+      zip,
+    }: {
+      id: string;
+      format: "txt" | "csv";
+      zip?: boolean;
+    }) => exportAdminRoomChat(id, format, zip),
+  });
+}
+
+export function useDeleteAdminRoom() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAdminRoom,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.admin.all });
+      toast.success(t("adminToast.roomDeleted"));
+    },
+    onError: onMutateError("admin.rooms.delete"),
+  });
+}
+
 export function useCreateAdminUser() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createAdminUser,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success("کاربر با موفقیت ایجاد شد");
+      toast.success(t("adminToast.userCreated"));
     },
-    onError: onMutateError("ایجاد کاربر ناموفق بود"),
+    onError: onMutateError("admin.users.create"),
   });
 }
 
 export function useUpdateAdminUser() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -164,38 +251,41 @@ export function useUpdateAdminUser() {
     }) => updateAdminUser(id, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success("کاربر به‌روزرسانی شد");
+      toast.success(t("adminToast.userUpdated"));
     },
-    onError: onMutateError("به‌روزرسانی کاربر ناموفق بود"),
+    onError: onMutateError("admin.users.update"),
   });
 }
 
 export function useDeleteAdminUser() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteAdminUser,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success("کاربر حذف شد");
+      toast.success(t("adminToast.userDeleted"));
     },
-    onError: onMutateError("حذف کاربر ناموفق بود"),
+    onError: onMutateError("admin.users.delete"),
   });
 }
 
 export function useBanAdminUser() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, banned }: { id: string; banned: boolean }) =>
       banAdminUser(id, banned),
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success(v.banned ? "کاربر مسدود شد" : "مسدودیت کاربر برداشته شد");
+      toast.success(v.banned ? t("adminToast.userBanned") : t("adminToast.userUnbanned"));
     },
-    onError: onMutateError("تغییر وضعیت کاربر ناموفق بود"),
+    onError: onMutateError("admin.users.ban"),
   });
 }
 
 export function useAssignUserSubscription() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -205,33 +295,36 @@ export function useAssignUserSubscription() {
       id: string;
       body: { plan_slug: string; expires_at?: string };
     }) => assignUserSubscription(id, body),
-    onSuccess: onMutateSuccess("اشتراک کاربر تنظیم شد"),
-    onError: onMutateError("تنظیم اشتراک ناموفق بود"),
+    onSuccess: onMutateSuccess(t("adminToast.subscriptionSet")),
+    onError: onMutateError("admin.users.subscription"),
   });
 }
 
 export function useResetAdminUserPassword() {
+  const { t } = useTranslation();
   return useMutation({
     mutationFn: ({ id, password }: { id: string; password: string }) =>
       resetAdminUserPassword(id, password),
-    onSuccess: onMutateSuccess("رمز عبور کاربر تغییر کرد"),
-    onError: onMutateError("تغییر رمز عبور ناموفق بود"),
+    onSuccess: onMutateSuccess(t("adminToast.passwordChanged")),
+    onError: onMutateError("admin.users.password"),
   });
 }
 
 export function useCreateAdminPlan() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createAdminPlan,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.plans() });
-      toast.success("پلن ایجاد شد");
+      toast.success(t("adminToast.planCreated"));
     },
-    onError: onMutateError("ایجاد پلن ناموفق بود"),
+    onError: onMutateError("admin.plans.create"),
   });
 }
 
 export function useUpdateAdminPlan() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -243,62 +336,67 @@ export function useUpdateAdminPlan() {
     }) => updateAdminPlan(id, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.plans() });
-      toast.success("پلن به‌روزرسانی شد");
+      toast.success(t("adminToast.planUpdated"));
     },
-    onError: onMutateError("به‌روزرسانی پلن ناموفق بود"),
+    onError: onMutateError("admin.plans.update"),
   });
 }
 
 export function useResolveAdminReport() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: resolveAdminReport,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success("گزارش رسیدگی شد");
+      toast.success(t("adminToast.reportResolved"));
     },
-    onError: onMutateError("رسیدگی به گزارش ناموفق بود"),
+    onError: onMutateError("admin.reports.resolve"),
   });
 }
 
 export function useDeleteAdminVideo() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteAdminVideo,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success("ویدیو حذف شد");
+      toast.success(t("adminToast.videoDeleted"));
     },
-    onError: onMutateError("حذف ویدیو ناموفق بود"),
+    onError: onMutateError("admin.videos.delete"),
   });
 }
 
 export function useCloseAdminRoom() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: closeAdminRoom,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.all });
-      toast.success("اتاق بسته شد");
+      toast.success(t("adminToast.roomClosed"));
     },
-    onError: onMutateError("بستن اتاق ناموفق بود"),
+    onError: onMutateError("admin.rooms.close"),
   });
 }
 
 export function useUpdateAdminSettings() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: updateAdminSettings,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.settings() });
       qc.invalidateQueries({ queryKey: ["public-settings"] });
-      toast.success("تنظیمات ذخیره شد");
+      toast.success(t("adminToast.settingsSaved"));
     },
-    onError: onMutateError("ذخیره تنظیمات ناموفق بود"),
+    onError: onMutateError("admin.settings"),
   });
 }
 
 export function useSetMaintenanceMode() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: setMaintenanceMode,
@@ -306,26 +404,28 @@ export function useSetMaintenanceMode() {
       qc.invalidateQueries({ queryKey: queryKeys.admin.settings() });
       qc.invalidateQueries({ queryKey: ["public-settings"] });
       toast.success(
-        enabled ? "حالت تعمیرات فعال شد" : "حالت تعمیرات غیرفعال شد"
+        enabled ? t("adminToast.maintenanceEnabled") : t("adminToast.maintenanceDisabled")
       );
     },
-    onError: onMutateError("تغییر حالت تعمیرات ناموفق بود"),
+    onError: onMutateError("admin.maintenance"),
   });
 }
 
 export function useCreateAdminDiscount() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: createAdminDiscount,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.discounts() });
-      toast.success("کد تخفیف ایجاد شد");
+      toast.success(t("adminToast.discountCreated"));
     },
-    onError: onMutateError("ایجاد کد تخفیف ناموفق بود"),
+    onError: onMutateError("admin.coupons.create"),
   });
 }
 
 export function useUpdateAdminDiscount() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -337,20 +437,21 @@ export function useUpdateAdminDiscount() {
     }) => updateAdminDiscount(id, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.discounts() });
-      toast.success("کد تخفیف به‌روزرسانی شد");
+      toast.success(t("adminToast.discountUpdated"));
     },
-    onError: onMutateError("به‌روزرسانی کد تخفیف ناموفق بود"),
+    onError: onMutateError("admin.coupons.update"),
   });
 }
 
 export function useDeleteAdminDiscount() {
+  const { t } = useTranslation();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: deleteAdminDiscount,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.admin.discounts() });
-      toast.success("کد تخفیف حذف شد");
+      toast.success(t("adminToast.discountDeleted"));
     },
-    onError: onMutateError("حذف کد تخفیف ناموفق بود"),
+    onError: onMutateError("admin.coupons.delete"),
   });
 }

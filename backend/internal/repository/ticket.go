@@ -5,6 +5,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"watch-party/internal/models"
 )
@@ -31,6 +32,45 @@ func (r *Repository) ListTickets(ctx context.Context, userID string) ([]models.T
 		tickets = []models.Ticket{}
 	}
 	return tickets, nil
+}
+
+func (r *Repository) ListTicketsPaginated(ctx context.Context, status string, page, limit int) (*models.PaginatedResult[models.Ticket], error) {
+	page, limit = parsePageLimit(page, limit)
+	filter := bson.M{}
+	if status != "" {
+		filter["status"] = status
+	}
+	total, err := r.coll(collTickets).CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	skip := int64((page - 1) * limit)
+	opts := options.Find().SetSort(bson.D{{Key: "updated_at", Value: -1}}).SetSkip(skip).SetLimit(int64(limit))
+	cur, err := r.coll(collTickets).Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var tickets []models.Ticket
+	if err := cur.All(ctx, &tickets); err != nil {
+		return nil, err
+	}
+	if tickets == nil {
+		tickets = []models.Ticket{}
+	}
+	return &models.PaginatedResult[models.Ticket]{Items: tickets, Total: total, Page: page, Limit: limit}, nil
+}
+
+func (r *Repository) UpdateTicketStatus(ctx context.Context, id, status string) error {
+	oid, err := parseObjectID(id)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll(collTickets).UpdateByID(ctx, oid, bson.M{"$set": bson.M{
+		"status":     status,
+		"updated_at": models.NowUTC(),
+	}})
+	return err
 }
 
 func (r *Repository) GetTicket(ctx context.Context, id string) (*models.Ticket, error) {

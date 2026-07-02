@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+
+	"watch-party/internal/models"
 )
 
 func (h *Handler) ListVideos(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +39,7 @@ func (h *Handler) UploadVideo(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create video")
 		return
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "video_upload", "video", video.ID.Hex(), req.Title)
 	WriteJSON(w, http.StatusCreated, video)
 }
 

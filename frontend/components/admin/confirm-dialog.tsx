@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ModalShell } from "@/components/dashboard/modals/modal-shell";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface AdminConfirmDialogProps {
   open: boolean;
@@ -21,12 +22,13 @@ export function AdminConfirmDialog({
   onClose,
   title,
   description,
-  confirmLabel = "تأیید",
-  cancelLabel = "انصراف",
+  confirmLabel,
+  cancelLabel,
   variant = "primary",
   onConfirm,
   children,
 }: AdminConfirmDialogProps) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   const handleConfirm = async () => {
@@ -49,7 +51,7 @@ export function AdminConfirmDialog({
           onClick={onClose}
           className="rounded-xl border border-zinc-700 px-3 py-2 text-sm text-zinc-300 disabled:opacity-50"
         >
-          {cancelLabel}
+          {cancelLabel ?? t("common.cancel")}
         </button>
         <button
           type="button"
@@ -60,7 +62,7 @@ export function AdminConfirmDialog({
           }`}
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : null}
-          {confirmLabel}
+          {confirmLabel ?? t("common.confirm")}
         </button>
       </div>
     </ModalShell>

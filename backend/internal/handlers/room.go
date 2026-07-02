@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
+	"watch-party/internal/models"
 	"watch-party/internal/util"
 	"watch-party/internal/ws"
 )
@@ -22,6 +24,12 @@ type updateRoomVideoRequest struct {
 
 type seekRequest struct {
 	CurrentTime float64 `json:"current_time"`
+}
+
+type createRoomResponse struct {
+	models.Room
+	InviteCode    string `json:"invite_code"`
+	InviteExpires string `json:"invite_expires"`
 }
 
 // CreateRoom godoc
@@ -52,7 +60,14 @@ func (h *Handler) CreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Hub.AddRoom(room)
-	WriteJSON(w, http.StatusCreated, room)
+	expires := time.Now().UTC().Add(7 * 24 * time.Hour)
+	_ = h.Repo.CreateInvitation(r.Context(), room.ID.Hex(), room.Slug, expires, 100)
+	_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "room_create", "room", room.ID.Hex(), room.Title)
+	WriteJSON(w, http.StatusCreated, createRoomResponse{
+		Room:          *room,
+		InviteCode:    room.Slug,
+		InviteExpires: expires.Format(time.RFC3339),
+	})
 }
 
 // ListRooms godoc
@@ -104,9 +119,8 @@ func (h *Handler) SearchRooms(w http.ResponseWriter, r *http.Request) {
 // @Router /api/rooms/{id} [get]
 func (h *Handler) GetRoom(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
-	room, err := h.Repo.GetRoom(r.Context(), roomID)
-	if err != nil {
-		WriteJSONError(w, http.StatusNotFound, "Room not found")
+	room, ok := h.requireActiveRoom(w, r, roomID)
+	if !ok {
 		return
 	}
 	WriteJSON(w, http.StatusOK, room)
@@ -126,9 +140,8 @@ func (h *Handler) UpdateRoomVideo(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
 	uid := userID(r)
 
-	room, err := h.Repo.GetRoom(r.Context(), roomID)
-	if err != nil {
-		WriteJSONError(w, http.StatusNotFound, "Room not found")
+	room, ok := h.requireActiveRoom(w, r, roomID)
+	if !ok {
 		return
 	}
 	if room.OwnerID.Hex() != uid {
@@ -166,8 +179,8 @@ func (h *Handler) UpdateRoomVideo(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) CreateInvitation(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
 	code := util.GenerateInviteCode()
-	expires := time.Now().UTC().Add(24 * time.Hour)
-	if err := h.Repo.CreateInvitation(r.Context(), roomID, code, expires, 1); err != nil {
+	expires := time.Now().UTC().Add(7 * 24 * time.Hour)
+	if err := h.Repo.CreateInvitation(r.Context(), roomID, code, expires, 100); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create invitation")
 		return
 	}
@@ -197,15 +210,41 @@ func (h *Handler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
-	inv, err := h.Repo.ValidateInvitation(r.Context(), req.Code)
-	if err != nil {
-		WriteJSONError(w, http.StatusNotFound, "Invalid or expired invitation")
+	code := strings.TrimSpace(req.Code)
+	if code == "" {
+		WriteJSONError(w, http.StatusBadRequest, "code is required")
 		return
 	}
-	if err := h.Repo.UseInvitation(r.Context(), req.Code); err != nil {
+
+	inv, err := h.Repo.ValidateInvitation(r.Context(), code)
+	if err != nil {
+		room, rerr := h.Repo.GetRoomBySlug(r.Context(), util.NormalizeInviteCode(code))
+		if rerr != nil {
+			WriteJSONError(w, http.StatusNotFound, "Invalid or expired invitation")
+			return
+		}
+		if isRoomClosed(room) {
+			WriteJSONError(w, http.StatusGone, "Room is closed")
+			return
+		}
+		_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "room_join", "room", room.ID.Hex(), code)
+		WriteJSON(w, http.StatusOK, map[string]string{"room_id": room.ID.Hex()})
+		return
+	}
+	if err := h.Repo.UseInvitation(r.Context(), code); err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to accept invitation")
 		return
 	}
+	room, rerr := h.Repo.GetRoom(r.Context(), inv.RoomID.Hex())
+	if rerr != nil {
+		WriteJSONError(w, http.StatusNotFound, "Room not found")
+		return
+	}
+	if isRoomClosed(room) {
+		WriteJSONError(w, http.StatusGone, "Room is closed")
+		return
+	}
+	_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "room_join", "room", room.ID.Hex(), code)
 	WriteJSON(w, http.StatusOK, map[string]string{"room_id": inv.RoomID.Hex()})
 }
 
@@ -219,6 +258,9 @@ func (h *Handler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
 // @Router /api/rooms/{id}/messages [get]
 func (h *Handler) GetRoomMessages(w http.ResponseWriter, r *http.Request) {
 	roomID := mux.Vars(r)["id"]
+	if _, ok := h.requireActiveRoom(w, r, roomID); !ok {
+		return
+	}
 	messages, err := h.Repo.GetMessages(r.Context(), roomID, 100)
 	if err != nil {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to load messages")
@@ -268,9 +310,8 @@ func (h *Handler) SeekVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	room, err := h.Repo.GetRoom(r.Context(), roomID)
-	if err != nil {
-		WriteJSONError(w, http.StatusNotFound, "Room not found")
+	room, ok := h.requireActiveRoom(w, r, roomID)
+	if !ok {
 		return
 	}
 	if room.OwnerID.Hex() != uid {
@@ -291,9 +332,8 @@ func (h *Handler) updatePlayback(w http.ResponseWriter, r *http.Request, playing
 	roomID := mux.Vars(r)["id"]
 	uid := userID(r)
 
-	room, err := h.Repo.GetRoom(r.Context(), roomID)
-	if err != nil {
-		WriteJSONError(w, http.StatusNotFound, "Room not found")
+	room, ok := h.requireActiveRoom(w, r, roomID)
+	if !ok {
 		return
 	}
 	if room.OwnerID.Hex() != uid {

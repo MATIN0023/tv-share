@@ -15,17 +15,20 @@ import {
   LogOut 
 } from 'lucide-react';
 
-const menuItems = [
-  { href: '/dashboard', icon: Home, label: 'داشبورد' },
-  { href: '/friends', icon: Users, label: 'دوستان' },
-  { href: '/schedule', icon: Calendar, label: 'زمان‌بندی' },
-  { href: '/history', icon: Clock, label: 'تاریخچه' },
-  { href: '/settings', icon: Settings, label: 'تنظیمات' },
-];
+import { useTranslation } from "@/providers/i18n-provider";
 
 const DashboardSidebar: React.FC = () => {
+  const { t } = useTranslation();
   const pathname = usePathname();
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const menuItems = [
+    { href: "/dashboard", icon: Home, label: t("sidebar.dashboard") },
+    { href: "/friends", icon: Users, label: t("sidebar.friends") },
+    { href: "/schedule", icon: Calendar, label: t("sidebar.schedule") },
+    { href: "/history", icon: Clock, label: t("sidebar.history") },
+    { href: "/settings", icon: Settings, label: t("sidebar.settings") },
+  ];
 
   return (
     <SidebarContainer ref={sidebarRef}>
@@ -96,7 +99,7 @@ const DashboardSidebar: React.FC = () => {
             >
               <LogoutButton>
                 <LogOut size={20} />
-                <span>خروج</span>
+                <span>{t("common.logout")}</span>
               </LogoutButton>
             </LiquidGlass>
           </BottomSection>

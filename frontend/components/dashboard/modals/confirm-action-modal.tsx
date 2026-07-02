@@ -1,6 +1,7 @@
 "use client";
 
 import { ModalShell } from "./modal-shell";
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface ConfirmActionModalProps {
   open: boolean;
@@ -21,6 +22,8 @@ export function ConfirmActionModal({
   onConfirm,
   children,
 }: ConfirmActionModalProps) {
+  const { t } = useTranslation();
+
   return (
     <ModalShell open={open} onClose={onClose} title={title} description={description}>
       {children}
@@ -30,7 +33,7 @@ export function ConfirmActionModal({
           onClick={onClose}
           className="rounded-xl border border-white/20 px-3 py-2 text-sm"
         >
-          انصراف
+          {t("common.cancel")}
         </button>
         <button
           type="button"

@@ -6,16 +6,22 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
+	"watch-party/internal/ratelimit"
 )
 
+const chatRateMax = 20
+const chatRateWindow = time.Minute
+
 type Client struct {
-	hub      *Hub
-	conn     *websocket.Conn
-	send     chan *Message
-	roomID   string
-	userID   string
-	nickname string
-	userInfo *UserInfo
+	hub           *Hub
+	conn          *websocket.Conn
+	send          chan *Message
+	roomID        string
+	userID        string
+	nickname      string
+	userInfo      *UserInfo
+	chatLimiter   *ratelimit.Limiter
 }
 
 func (c *Client) readPump() {
@@ -60,6 +66,8 @@ func (c *Client) readPump() {
 			c.hub.BroadcastRoomState(c.roomID)
 		case "get_history":
 			c.sendHistory()
+		case "reaction":
+			c.handleReaction(&msg)
 		}
 	}
 }
@@ -82,8 +90,19 @@ func (c *Client) ctx() context.Context {
 	return context.Background()
 }
 
-func (c *Client) handleVideoPlay() {
+func (c *Client) isRoomOwner() bool {
 	if c.roomID == "" {
+		return false
+	}
+	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
+	if err != nil {
+		return false
+	}
+	return room.OwnerID.Hex() == c.userID
+}
+
+func (c *Client) handleVideoPlay() {
+	if c.roomID == "" || !c.isRoomOwner() {
 		return
 	}
 	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
@@ -97,7 +116,7 @@ func (c *Client) handleVideoPlay() {
 }
 
 func (c *Client) handleVideoPause() {
-	if c.roomID == "" {
+	if c.roomID == "" || !c.isRoomOwner() {
 		return
 	}
 	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
@@ -111,7 +130,7 @@ func (c *Client) handleVideoPause() {
 }
 
 func (c *Client) handleVideoSeek(msg *Message) {
-	if c.roomID == "" {
+	if c.roomID == "" || !c.isRoomOwner() {
 		return
 	}
 	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
@@ -124,7 +143,7 @@ func (c *Client) handleVideoSeek(msg *Message) {
 }
 
 func (c *Client) handleVideoEnded() {
-	if c.roomID == "" {
+	if c.roomID == "" || !c.isRoomOwner() {
 		return
 	}
 	room, err := c.hub.repo.GetRoom(c.ctx(), c.roomID)
@@ -143,6 +162,14 @@ func (c *Client) handleChat(msg *Message) {
 		return
 	}
 
+	if c.chatLimiter == nil {
+		c.chatLimiter = ratelimit.New(chatRateMax, chatRateWindow)
+	}
+	if !c.chatLimiter.Allow(c.userID) {
+		c.send <- &Message{Type: "error", Text: "Too many messages — slow down"}
+		return
+	}
+
 	senderName := c.nickname
 	if user, err := c.hub.repo.GetUserByID(c.ctx(), c.userID); err == nil && user.DisplayName != "" {
 		senderName = user.DisplayName
@@ -156,11 +183,25 @@ func (c *Client) handleChat(msg *Message) {
 }
 
 func (c *Client) handleVideoChange(msg *Message) {
-	if c.roomID == "" {
+	if c.roomID == "" || !c.isRoomOwner() {
 		return
 	}
 	_ = c.hub.repo.UpdateRoomVideo(c.ctx(), c.roomID, msg.Video)
 	msg.From = c.nickname
+	msg.FromID = c.userID
+	c.hub.BroadcastToRoom(c.roomID, msg)
+}
+
+func (c *Client) handleReaction(msg *Message) {
+	if c.roomID == "" || msg.Emoji == "" {
+		return
+	}
+	senderName := c.nickname
+	if user, err := c.hub.repo.GetUserByID(c.ctx(), c.userID); err == nil && user.DisplayName != "" {
+		senderName = user.DisplayName
+	}
+	msg.Type = "reaction"
+	msg.From = senderName
 	msg.FromID = c.userID
 	c.hub.BroadcastToRoom(c.roomID, msg)
 }

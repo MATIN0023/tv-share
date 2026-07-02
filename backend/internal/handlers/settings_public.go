@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"net/http"
-
-	"watch-party/internal/models"
 )
 
 func (h *Handler) GetPublicSettings(w http.ResponseWriter, r *http.Request) {

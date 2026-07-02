@@ -3,12 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   acceptInvitation,
+  createInvitation,
   createRoom,
   getRoom,
   getRoomMessages,
   listRooms,
   pauseRoom,
   playRoom,
+  updateRoomVideo,
   queryKeys,
   seekRoom,
 } from "@/lib/api";
@@ -34,7 +36,10 @@ export function useRoomMessages(id: string | null) {
     queryKey: queryKeys.rooms.messages(id ?? ""),
     queryFn: () => getRoomMessages(id!),
     enabled: Boolean(id) && typeof document !== "undefined",
-    refetchInterval: 10_000,
+    refetchInterval: () =>
+      typeof document !== "undefined" && document.visibilityState === "visible"
+        ? 15_000
+        : false,
   });
 }
 
@@ -86,6 +91,24 @@ export function useSeekRoom() {
       seekRoom(id, position),
     onSuccess: (_data, vars) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.rooms.detail(vars.id) });
+    },
+  });
+}
+
+export function useCreateInvitation() {
+  return useMutation({
+    mutationFn: createInvitation,
+  });
+}
+
+export function useUpdateRoomVideo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, videoUrl }: { id: string; videoUrl: string }) =>
+      updateRoomVideo(id, videoUrl),
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.detail(vars.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.rooms.all });
     },
   });
 }

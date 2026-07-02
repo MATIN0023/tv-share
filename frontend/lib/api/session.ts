@@ -3,10 +3,15 @@ import type { AuthResponse } from "@/lib/api/types";
 
 const MAX_AGE = 60 * 60 * 24; // 24 hours
 
+export function syncRoleCookie(role: string): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${ROLE_COOKIE}=${role}; path=/; max-age=${MAX_AGE}; SameSite=Lax`;
+}
+
 export function persistSession(auth: AuthResponse): void {
   if (typeof document === "undefined") return;
   document.cookie = `${AUTH_TOKEN_COOKIE}=${auth.token}; path=/; max-age=${MAX_AGE}; SameSite=Lax`;
-  document.cookie = `${ROLE_COOKIE}=${auth.role}; path=/; max-age=${MAX_AGE}; SameSite=Lax`;
+  syncRoleCookie(auth.role);
 }
 
 export function clearSession(): void {

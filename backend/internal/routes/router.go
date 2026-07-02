@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gorilla/mux"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -9,6 +10,7 @@ import (
 	"watch-party/internal/auth"
 	"watch-party/internal/handlers"
 	"watch-party/internal/middleware"
+	"watch-party/internal/ratelimit"
 	"watch-party/internal/repository"
 	"watch-party/internal/ws"
 
@@ -18,8 +20,13 @@ import (
 func New(h *handlers.Handler, authH *auth.Handler, hub *ws.Hub, jwtAuth *auth.JWT, repo *repository.Repository) http.Handler {
 	r := mux.NewRouter().StrictSlash(true)
 
+	loginLimiter := ratelimit.New(10, time.Minute)
+	registerLimiter := ratelimit.New(5, time.Minute)
+	otpVerifyLimiter := ratelimit.New(15, time.Minute)
+	otpIPLimiter := ratelimit.New(20, time.Minute)
+
 	r.HandleFunc("/ws", func(w http.ResponseWriter, req *http.Request) {
-		ws.Serve(hub, w, req)
+		ws.Serve(hub, jwtAuth, w, req)
 	}).Methods(http.MethodGet)
 
 	r.PathPrefix("/docs/").Handler(httpSwagger.WrapHandler)
@@ -34,17 +41,21 @@ func New(h *handlers.Handler, authH *auth.Handler, hub *ws.Hub, jwtAuth *auth.JW
 	r.HandleFunc("/api/settings/public", h.GetPublicSettings).Methods(http.MethodGet)
 
 	authRouter := r.PathPrefix("/auth").Subrouter()
-	authRouter.HandleFunc("/register", h.Register).Methods(http.MethodPost)
-	authRouter.HandleFunc("/login", h.Login).Methods(http.MethodPost)
-	authRouter.HandleFunc("/otp/request", authH.RequestOTP).Methods(http.MethodPost)
-	authRouter.HandleFunc("/otp/verify", authH.VerifyOTP).Methods(http.MethodPost)
+	authRouter.Handle("/register", middleware.RateLimitByIP(registerLimiter)(http.HandlerFunc(h.Register))).Methods(http.MethodPost)
+	authRouter.Handle("/login", middleware.RateLimitByIP(loginLimiter)(http.HandlerFunc(h.Login))).Methods(http.MethodPost)
+	authRouter.Handle("/otp/request", middleware.RateLimitByIP(otpIPLimiter)(http.HandlerFunc(authH.RequestOTP))).Methods(http.MethodPost)
+	authRouter.Handle("/otp/verify", middleware.RateLimitByIP(otpVerifyLimiter)(http.HandlerFunc(authH.VerifyOTP))).Methods(http.MethodPost)
+	authRouter.Handle("/google", middleware.RateLimitByIP(loginLimiter)(http.HandlerFunc(h.GoogleLogin))).Methods(http.MethodPost)
 
 	api := r.PathPrefix("/api").Subrouter()
-	api.Use(middleware.RequireAuth(jwtAuth))
+	api.Use(middleware.RequireAuth(jwtAuth, repo))
 	api.Use(middleware.MaintenanceMode(repo))
+
+	api.HandleFunc("/assistant/chat", h.AssistantChat).Methods(http.MethodPost)
 
 	// User profile
 	api.HandleFunc("/users/me", h.GetCurrentUser).Methods(http.MethodGet)
+	api.HandleFunc("/auth/logout", h.Logout).Methods(http.MethodPost)
 	api.HandleFunc("/users/me", h.UpdateProfile).Methods(http.MethodPut)
 	api.HandleFunc("/users/me/password", h.ChangePassword).Methods(http.MethodPut)
 	api.HandleFunc("/users/me/avatar", h.UpdateAvatar).Methods(http.MethodPut)
@@ -131,6 +142,11 @@ func New(h *handlers.Handler, authH *auth.Handler, hub *ws.Hub, jwtAuth *auth.JW
 	admin.HandleFunc("/rooms", h.AdminListRooms).Methods(http.MethodGet)
 	admin.HandleFunc("/rooms/live", h.AdminListLiveRooms).Methods(http.MethodGet)
 	admin.HandleFunc("/rooms/{id}/close", h.AdminCloseRoom).Methods(http.MethodPut)
+	admin.HandleFunc("/rooms/{id}", h.AdminDeleteRoom).Methods(http.MethodDelete)
+	admin.HandleFunc("/rooms/{id}/export-chat", h.ExportRoomChat).Methods(http.MethodGet)
+	admin.HandleFunc("/tickets", h.AdminListTickets).Methods(http.MethodGet)
+	admin.HandleFunc("/tickets/{id}/status", h.AdminUpdateTicketStatus).Methods(http.MethodPut)
+	admin.HandleFunc("/tickets/{id}/messages", h.AdminReplyTicket).Methods(http.MethodPost)
 	admin.HandleFunc("/discounts", h.AdminListDiscounts).Methods(http.MethodGet)
 	admin.HandleFunc("/discounts", h.AdminCreateDiscount).Methods(http.MethodPost)
 	admin.HandleFunc("/discounts/{id}", h.AdminUpdateDiscount).Methods(http.MethodPut)

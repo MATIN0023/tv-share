@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslation } from "@/providers/i18n-provider";
+
 interface VideoRow {
   id: string;
   title: string;
@@ -11,15 +15,17 @@ interface VideosTableProps {
 }
 
 export function VideosTable({ rows, onDelete }: VideosTableProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10">
       <table className="w-full text-sm">
         <thead className="bg-white/5 text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 text-right">عنوان</th>
-            <th className="px-3 py-2 text-right">وضعیت</th>
-            <th className="px-3 py-2 text-right">پیشرفت</th>
-            <th className="px-3 py-2 text-right">عملیات</th>
+            <th className="px-3 py-2 text-right">{t("tables.title")}</th>
+            <th className="px-3 py-2 text-right">{t("common.status")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.progress")}</th>
+            <th className="px-3 py-2 text-right">{t("common.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -35,10 +41,10 @@ export function VideosTable({ rows, onDelete }: VideosTableProps) {
                     onClick={() => onDelete(row.id)}
                     className="text-red-400"
                   >
-                    حذف
+                    {t("common.delete")}
                   </button>
                 ) : (
-                  <span className="text-muted-foreground">—</span>
+                  <span className="text-muted-foreground">{t("common.dash")}</span>
                 )}
               </td>
             </tr>

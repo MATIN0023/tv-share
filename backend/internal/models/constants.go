@@ -55,3 +55,7 @@ const (
 )
 
 const SettingsGlobalID = "global"
+
+func IsAdminRole(role string) bool {
+	return role == RoleAdmin || role == RoleSuperAdmin
+}

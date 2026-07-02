@@ -1,4 +1,7 @@
 import { authApiRequest } from "./authenticated";
+import { API_BASE_URL } from "./client";
+import { getAuthToken } from "./session";
+import { ApiError } from "./client";
 import type { Room, RoomMessage } from "./types";
 
 export async function listRooms(): Promise<Room[]> {
@@ -66,4 +69,32 @@ export async function seekRoom(id: string, currentTime: number): Promise<Room> {
     method: "POST",
     body: { current_time: currentTime },
   });
+}
+
+export async function exportRoomChat(
+  id: string,
+  format: "txt" | "csv" = "txt",
+  zip = false
+): Promise<Blob> {
+  const token = getAuthToken();
+  const params = new URLSearchParams({ format });
+  if (zip) params.set("zip", "1");
+  const res = await fetch(
+    `${API_BASE_URL}/api/rooms/${id}/export-chat?${params.toString()}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let message = res.statusText;
+    try {
+      const data = JSON.parse(text);
+      if (data?.error) message = String(data.error);
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(message, res.status);
+  }
+  return res.blob();
 }

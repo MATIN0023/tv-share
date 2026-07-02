@@ -7,11 +7,21 @@ import (
 )
 
 type Handler struct {
-	Repo    *repository.Repository
-	Hub     *ws.Hub
-	JWT     *auth.JWT
+	Repo                 *repository.Repository
+	Hub                  *ws.Hub
+	JWT                  *auth.JWT
+	PaymentWebhookSecret string
+	GoogleClientID       string
+	AssistantServiceURL  string
 }
 
-func New(repo *repository.Repository, hub *ws.Hub, jwtAuth *auth.JWT) *Handler {
-	return &Handler{Repo: repo, Hub: hub, JWT: jwtAuth}
+func New(repo *repository.Repository, hub *ws.Hub, jwtAuth *auth.JWT, paymentWebhookSecret, googleClientID, assistantServiceURL string) *Handler {
+	return &Handler{
+		Repo:                 repo,
+		Hub:                  hub,
+		JWT:                  jwtAuth,
+		PaymentWebhookSecret: paymentWebhookSecret,
+		GoogleClientID:       googleClientID,
+		AssistantServiceURL:  assistantServiceURL,
+	}
 }

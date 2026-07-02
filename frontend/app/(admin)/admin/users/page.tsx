@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, Suspense, useEffect, useCallback } from "react";
+import { useState, Suspense, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AdminError } from "@/components/admin/admin-error";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
 import { AdminPanel } from "@/components/admin/admin-panel";
 import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -21,22 +22,26 @@ import {
   useUpdateAdminUser,
 } from "@/hooks/use-admin";
 import {
-  adminCreateUserSchema,
-  adminEditUserSchema,
+  createAdminSchemas,
   type AdminCreateUserForm,
   type AdminEditUserForm,
-} from "@/lib/validations/admin";
+} from "@/lib/validations/create-admin-schemas";
 import { formatFaDate } from "@/lib/utils/format-date";
 import type { UserProfile } from "@/lib/api/types";
+import { AppLoader } from "@/components/ui/app-loader";
+import { useTranslation } from "@/providers/i18n-provider";
 
 const PAGE_SIZE = 15;
 
 function UsersPageContent() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const page = Number(searchParams.get("page") || "1");
   const search = searchParams.get("search") || "";
   const [searchDraft, setSearchDraft] = useState(search);
+
+  const schemas = useMemo(() => createAdminSchemas(t), [t]);
 
   useEffect(() => {
     setSearchDraft(search);
@@ -68,7 +73,7 @@ function UsersPageContent() {
   const [newPassword, setNewPassword] = useState("");
 
   const createForm = useForm<AdminCreateUserForm>({
-    resolver: zodResolver(adminCreateUserSchema),
+    resolver: zodResolver(schemas.adminCreateUserSchema),
     defaultValues: {
       display_name: "",
       phone_number: "",
@@ -79,7 +84,7 @@ function UsersPageContent() {
   });
 
   const editForm = useForm<AdminEditUserForm>({
-    resolver: zodResolver(adminEditUserSchema),
+    resolver: zodResolver(schemas.adminEditUserSchema),
   });
 
   const rows = usersQ.data?.items ?? [];
@@ -88,19 +93,19 @@ function UsersPageContent() {
 
   const statusBadge = (u: UserProfile) =>
     u.is_active === false ? (
-      <span className="text-red-400">مسدود</span>
+      <span className="text-red-400">{t("adminPages.banned")}</span>
     ) : (
-      <span className="text-emerald-400">فعال</span>
+      <span className="text-emerald-400">{t("adminPages.active")}</span>
     );
 
   return (
     <div>
       <AdminSectionHeader
-        title="مدیریت کاربران"
+        title={t("adminPages.usersTitle")}
         description={
           usersQ.isLoading
-            ? "در حال بارگذاری..."
-            : `نمایش ${rows.length} از ${total} کاربر`
+            ? t("common.loading")
+            : `${t("adminPages.showing")} ${rows.length} ${t("adminPages.of")} ${total} ${t("adminPages.userUnit")}`
         }
         action={
           <button
@@ -112,24 +117,24 @@ function UsersPageContent() {
             className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-zinc-950"
           >
             <UserPlus className="size-4" />
-            کاربر جدید
+            {t("adminPages.newUser")}
           </button>
         }
       />
 
       {usersQ.isError ? (
-        <p className="mb-4 text-red-400">
-          خطا در بارگذاری کاربران —{" "}
-          <button type="button" className="underline" onClick={() => usersQ.refetch()}>
-            تلاش مجدد
-          </button>
-        </p>
+        <AdminError
+          error={usersQ.error}
+          context="admin.users"
+          onRetry={() => usersQ.refetch()}
+          className="mb-4"
+        />
       ) : null}
 
       <AdminPanel>
         <div className="mb-4">
           <DebouncedSearchField
-            placeholder="جستجو: نام، موبایل، نقش یا شناسه کاربر..."
+            placeholder={t("adminPages.searchUsers")}
             value={searchDraft}
             onDebouncedChange={applySearch}
           />
@@ -139,21 +144,21 @@ function UsersPageContent() {
           <table className="w-full min-w-[960px] text-sm">
             <thead className="bg-zinc-900 text-zinc-500">
               <tr>
-                <th className="px-3 py-2 text-right">شناسه</th>
-                <th className="px-3 py-2 text-right">نام</th>
-                <th className="px-3 py-2 text-right">موبایل</th>
-                <th className="px-3 py-2 text-right">نقش</th>
-                <th className="px-3 py-2 text-right">پلن</th>
-                <th className="px-3 py-2 text-right">وضعیت</th>
-                <th className="px-3 py-2 text-right">تاریخ عضویت</th>
-                <th className="px-3 py-2 text-right">عملیات</th>
+                <th className="px-3 py-2 text-right">{t("tables.userId")}</th>
+                <th className="px-3 py-2 text-right">{t("tables.name")}</th>
+                <th className="px-3 py-2 text-right">{t("adminPages.mobile")}</th>
+                <th className="px-3 py-2 text-right">{t("adminPages.role")}</th>
+                <th className="px-3 py-2 text-right">{t("adminPages.plan")}</th>
+                <th className="px-3 py-2 text-right">{t("common.status")}</th>
+                <th className="px-3 py-2 text-right">{t("adminPages.joinedAt")}</th>
+                <th className="px-3 py-2 text-right">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
               {usersQ.isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-zinc-500">
-                    در حال بارگذاری...
+                  <td colSpan={8} className="px-3 py-2">
+                    <AppLoader variant="inline" className="py-4" showLabel={false} />
                   </td>
                 </tr>
               ) : rows.length ? (
@@ -162,7 +167,7 @@ function UsersPageContent() {
                     <td className="px-3 py-2 font-mono text-xs text-zinc-500" dir="ltr">
                       {u.id.slice(-8)}
                     </td>
-                    <td className="px-3 py-2">{u.display_name ?? "—"}</td>
+                    <td className="px-3 py-2">{u.display_name ?? t("common.dash")}</td>
                     <td className="px-3 py-2" dir="ltr">
                       {u.phone_number}
                     </td>
@@ -176,7 +181,7 @@ function UsersPageContent() {
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          title="ویرایش"
+                          title={t("adminPages.edit")}
                           onClick={() => {
                             setEditUser(u);
                             editForm.reset({
@@ -195,7 +200,7 @@ function UsersPageContent() {
                         </button>
                         <button
                           type="button"
-                          title="مسدود / آزاد"
+                          title={t("adminPages.banUnban")}
                           onClick={() => setBanUser(u)}
                           className="text-orange-400"
                         >
@@ -203,7 +208,7 @@ function UsersPageContent() {
                         </button>
                         <button
                           type="button"
-                          title="تغییر رمز"
+                          title={t("adminPages.changePassword")}
                           onClick={() => {
                             setResetId(u.id);
                             setNewPassword("");
@@ -214,7 +219,7 @@ function UsersPageContent() {
                         </button>
                         <button
                           type="button"
-                          title="حذف"
+                          title={t("common.delete")}
                           onClick={() => setDeleteId(u.id)}
                           className="text-red-400"
                         >
@@ -227,7 +232,7 @@ function UsersPageContent() {
               ) : (
                 <tr>
                   <td colSpan={8} className="px-3 py-6 text-center text-zinc-500">
-                    کاربری یافت نشد
+                    {t("adminPages.noUsersFound")}
                   </td>
                 </tr>
               )}
@@ -241,9 +246,9 @@ function UsersPageContent() {
       <AdminConfirmDialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
-        title="ایجاد کاربر جدید"
-        description="اطلاعات کاربر را با دقت وارد کنید"
-        confirmLabel="ایجاد کاربر"
+        title={t("adminPages.createUserTitle")}
+        description={t("adminPages.createUserDesc")}
+        confirmLabel={t("adminPages.createUser")}
         onConfirm={createForm.handleSubmit(async (data) => {
           await createMut.mutateAsync({
             phone_number: data.phone_number,
@@ -256,36 +261,36 @@ function UsersPageContent() {
       >
         <div className="space-y-3 text-sm">
           <LabeledField
-            label="نام نمایشی"
+            label={t("auth.displayName")}
             error={createForm.formState.errors.display_name?.message}
           >
             <Input className="border-zinc-700 bg-zinc-950" {...createForm.register("display_name")} />
           </LabeledField>
           <LabeledField
-            label="شماره موبایل"
-            hint="فرمت: 09123456789"
+            label={t("auth.phone")}
+            hint={t("adminPages.phoneFormat")}
             error={createForm.formState.errors.phone_number?.message}
           >
             <Input dir="ltr" className="border-zinc-700 bg-zinc-950" {...createForm.register("phone_number")} />
           </LabeledField>
           <LabeledField
-            label="رمز عبور"
-            hint="حداقل ۸ کاراکتر با حروف بزرگ، کوچک و عدد"
+            label={t("auth.password")}
+            hint={t("adminPages.passwordHint")}
             error={createForm.formState.errors.password?.message}
           >
             <Input type="password" className="border-zinc-700 bg-zinc-950" {...createForm.register("password")} />
           </LabeledField>
-          <LabeledField label="نقش کاربر">
+          <LabeledField label={t("adminPages.userRole")}>
             <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...createForm.register("role")}>
-              <option value="user">کاربر عادی</option>
-              <option value="admin">مدیر</option>
-              <option value="superadmin">مدیر ارشد</option>
+              <option value="user">{t("adminPages.regularUser")}</option>
+              <option value="admin">{t("adminPages.roleAdmin")}</option>
+              <option value="superadmin">{t("adminPages.roleSuperadmin")}</option>
             </select>
           </LabeledField>
-          <LabeledField label="پلن اشتراک اولیه">
+          <LabeledField label={t("adminPages.initialPlan")}>
             <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...createForm.register("subscription_plan")}>
-              <option value="free">رایگان</option>
-              <option value="premium">پریمیوم</option>
+              <option value="free">{t("adminPages.free")}</option>
+              <option value="premium">{t("adminPages.premium")}</option>
             </select>
           </LabeledField>
         </div>
@@ -294,8 +299,8 @@ function UsersPageContent() {
       <AdminConfirmDialog
         open={!!editUser}
         onClose={() => setEditUser(null)}
-        title="ویرایش کاربر"
-        confirmLabel="ذخیره تغییرات"
+        title={t("adminPages.editUser")}
+        confirmLabel={t("adminPages.saveChanges")}
         onConfirm={editForm.handleSubmit(async (data) => {
           if (!editUser) return;
           await updateMut.mutateAsync({
@@ -306,33 +311,33 @@ function UsersPageContent() {
       >
         <div className="space-y-3 text-sm">
           <LabeledField
-            label="نام نمایشی"
+            label={t("auth.displayName")}
             error={editForm.formState.errors.display_name?.message}
           >
             <Input className="border-zinc-700 bg-zinc-950" {...editForm.register("display_name")} />
           </LabeledField>
           <LabeledField
-            label="شماره موبایل"
+            label={t("auth.phone")}
             error={editForm.formState.errors.phone_number?.message}
           >
             <Input dir="ltr" className="border-zinc-700 bg-zinc-950" {...editForm.register("phone_number")} />
           </LabeledField>
-          <LabeledField label="نقش">
+          <LabeledField label={t("adminPages.role")}>
             <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...editForm.register("role")}>
-              <option value="user">کاربر عادی</option>
-              <option value="admin">مدیر</option>
-              <option value="superadmin">مدیر ارشد</option>
+              <option value="user">{t("adminPages.regularUser")}</option>
+              <option value="admin">{t("adminPages.roleAdmin")}</option>
+              <option value="superadmin">{t("adminPages.roleSuperadmin")}</option>
             </select>
           </LabeledField>
-          <LabeledField label="پلن اشتراک">
+          <LabeledField label={t("adminPages.subscriptionPlan")}>
             <select className="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-2" {...editForm.register("subscription_plan")}>
-              <option value="free">رایگان</option>
-              <option value="premium">پریمیوم</option>
+              <option value="free">{t("adminPages.free")}</option>
+              <option value="premium">{t("adminPages.premium")}</option>
             </select>
           </LabeledField>
           <label className="flex items-center gap-2">
             <input type="checkbox" {...editForm.register("is_active")} />
-            حساب فعال (غیرفعال = مسدود)
+            {t("adminPages.accountActive")}
           </label>
         </div>
       </AdminConfirmDialog>
@@ -340,10 +345,10 @@ function UsersPageContent() {
       <AdminConfirmDialog
         open={!!banUser}
         onClose={() => setBanUser(null)}
-        title={banUser?.is_active === false ? "رفع مسدودیت" : "مسدود کردن کاربر"}
-        description={`کاربر: ${banUser?.display_name ?? banUser?.phone_number}`}
+        title={banUser?.is_active === false ? t("adminPages.unban") : t("adminPages.banUser")}
+        description={`${t("adminPages.userPrefix")} ${banUser?.display_name ?? banUser?.phone_number}`}
         variant="danger"
-        confirmLabel={banUser?.is_active === false ? "رفع مسدودیت" : "مسدود کردن"}
+        confirmLabel={banUser?.is_active === false ? t("adminPages.unban") : t("adminPages.ban")}
         onConfirm={async () => {
           if (!banUser) return;
           await banMut.mutateAsync({
@@ -356,10 +361,10 @@ function UsersPageContent() {
       <AdminConfirmDialog
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="حذف کاربر"
-        description="این عملیات غیرقابل بازگشت است."
+        title={t("adminPages.deleteUser")}
+        description={t("adminPages.deleteIrreversible")}
         variant="danger"
-        confirmLabel="حذف قطعی"
+        confirmLabel={t("adminPages.deleteConfirm")}
         onConfirm={async () => {
           if (deleteId) await deleteMut.mutateAsync(deleteId);
         }}
@@ -368,9 +373,9 @@ function UsersPageContent() {
       <AdminConfirmDialog
         open={!!resetId}
         onClose={() => setResetId(null)}
-        title="تغییر رمز عبور"
-        description="رمز جدید حداقل ۸ کاراکتر با حروف بزرگ، کوچک و عدد"
-        confirmLabel="تغییر رمز"
+        title={t("adminPages.changePasswordTitle")}
+        description={t("adminPages.newPasswordHint")}
+        confirmLabel={t("adminPages.changePasswordBtn")}
         onConfirm={async () => {
           if (resetId && newPassword.length >= 8) {
             await resetMut.mutateAsync({ id: resetId, password: newPassword });
@@ -379,7 +384,7 @@ function UsersPageContent() {
       >
         <Input
           type="password"
-          placeholder="رمز جدید"
+          placeholder={t("adminPages.newPassword")}
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
         />
@@ -390,7 +395,7 @@ function UsersPageContent() {
 
 export default function AdminUsersPage() {
   return (
-    <Suspense fallback={<p className="text-zinc-500">در حال بارگذاری...</p>}>
+    <Suspense fallback={<AppLoader variant="section" />}>
       <UsersPageContent />
     </Suspense>
   );

@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+
+	"watch-party/internal/models"
 )
 
 type friendActionRequest struct {
@@ -65,6 +67,7 @@ func (h *Handler) SendFriendRequest(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to send request")
 		return
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), uid, models.RoleUser, "friend_request", "user", req.ToUserID, "")
 	WriteJSON(w, http.StatusCreated, map[string]string{"status": "sent"})
 }
 
@@ -86,6 +89,7 @@ func (h *Handler) AcceptFriendRequest(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to accept")
 		return
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "friend_accept", "user", req.FromUserID, "")
 	WriteJSON(w, http.StatusOK, map[string]string{"status": "accepted"})
 }
 

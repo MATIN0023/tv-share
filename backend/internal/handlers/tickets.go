@@ -53,6 +53,7 @@ func (h *Handler) CreateTicket(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = h.Repo.AddTicketMessage(r.Context(), msg)
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "ticket_create", "ticket", ticket.ID.Hex(), req.Subject)
 	WriteJSON(w, http.StatusCreated, ticket)
 }
 

@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslation } from "@/providers/i18n-provider";
+
 interface FriendRow {
   id: string;
   name: string;
@@ -20,15 +24,17 @@ export function FriendsTable({
   onBlock,
   showActions = "friends",
 }: FriendsTableProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10">
       <table className="w-full text-sm">
         <thead className="bg-white/5 text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 text-right">نام</th>
-            <th className="px-3 py-2 text-right">شناسه</th>
-            <th className="px-3 py-2 text-right">وضعیت</th>
-            <th className="px-3 py-2 text-right">عملیات</th>
+            <th className="px-3 py-2 text-right">{t("tables.name")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.userId")}</th>
+            <th className="px-3 py-2 text-right">{t("common.status")}</th>
+            <th className="px-3 py-2 text-right">{t("common.actions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -47,25 +53,25 @@ export function FriendsTable({
                       onClick={() => onAccept?.(row.id)}
                       className="text-emerald-400"
                     >
-                      پذیرش
+                      {t("tables.accept")}
                     </button>
                     <button
                       type="button"
                       onClick={() => onReject?.(row.id)}
                       className="text-red-400"
                     >
-                      رد
+                      {t("tables.reject")}
                     </button>
                   </div>
                 ) : showActions === "blocked" ? (
-                  <span className="text-muted-foreground">مسدود</span>
+                  <span className="text-muted-foreground">{t("dashboard.blockedStatus")}</span>
                 ) : (
                   <button
                     type="button"
                     onClick={() => onBlock?.(row.id)}
                     className="text-red-400"
                   >
-                    بلاک
+                    {t("dashboard.block")}
                   </button>
                 )}
               </td>

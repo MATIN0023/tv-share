@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AdminError } from "@/components/admin/admin-error";
 import { AdminSectionHeader } from "@/components/admin/admin-section-header";
 import { AdminPanel } from "@/components/admin/admin-panel";
 import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -17,16 +18,23 @@ import {
   useDeleteAdminDiscount,
   useUpdateAdminDiscount,
 } from "@/hooks/use-admin";
-import { adminDiscountSchema, type AdminDiscountForm } from "@/lib/validations/admin";
+import {
+  createAdminSchemas,
+  type AdminDiscountForm,
+} from "@/lib/validations/create-admin-schemas";
 import { formatFaDate } from "@/lib/utils/format-date";
 import type { DiscountCode } from "@/lib/api/types";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export default function AdminCouponsPage() {
+  const { t } = useTranslation();
   const discountsQ = useAdminDiscounts();
   const plansQ = useAdminPlans();
   const createMut = useCreateAdminDiscount();
   const updateMut = useUpdateAdminDiscount();
   const deleteMut = useDeleteAdminDiscount();
+
+  const schemas = useMemo(() => createAdminSchemas(t), [t]);
 
   const [open, setOpen] = useState(false);
   const [edit, setEdit] = useState<DiscountCode | null>(null);
@@ -35,7 +43,7 @@ export default function AdminCouponsPage() {
   const [selectedPlanSlugs, setSelectedPlanSlugs] = useState<string[]>([]);
 
   const form = useForm<AdminDiscountForm>({
-    resolver: zodResolver(adminDiscountSchema),
+    resolver: zodResolver(schemas.adminDiscountSchema),
     defaultValues: {
       code: "",
       discount_type: "percent",
@@ -118,8 +126,8 @@ export default function AdminCouponsPage() {
   return (
     <div>
       <AdminSectionHeader
-        title="کدهای تخفیف"
-        description="تعریف کد با تاریخ شمسی، سقف استفاده و انتخاب پلن"
+        title={t("adminPages.couponsTitle")}
+        description={t("adminPages.couponsDesc")}
         action={
           <button
             type="button"
@@ -127,13 +135,18 @@ export default function AdminCouponsPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-zinc-950"
           >
             <Plus className="size-4" />
-            کد جدید
+            {t("adminPages.newCoupon")}
           </button>
         }
       />
 
       {discountsQ.isError ? (
-        <p className="mb-4 text-red-400">خطا در بارگذاری کدهای تخفیف — سرور را بررسی کنید</p>
+        <AdminError
+          error={discountsQ.error}
+          context="admin.coupons"
+          onRetry={() => discountsQ.refetch()}
+          className="mb-4"
+        />
       ) : null}
 
       <AdminPanel>
@@ -141,14 +154,14 @@ export default function AdminCouponsPage() {
           <table className="w-full min-w-[800px] text-sm">
             <thead className="text-zinc-500">
               <tr>
-                <th className="py-2 text-right">کد</th>
-                <th className="py-2 text-right">نوع</th>
-                <th className="py-2 text-right">مقدار</th>
-                <th className="py-2 text-right">استفاده</th>
-                <th className="py-2 text-right">پلن‌ها</th>
-                <th className="py-2 text-right">اعتبار</th>
-                <th className="py-2 text-right">وضعیت</th>
-                <th className="py-2 text-right">عملیات</th>
+                <th className="py-2 text-right">{t("tables.code")}</th>
+                <th className="py-2 text-right">{t("tables.type")}</th>
+                <th className="py-2 text-right">{t("adminPages.value")}</th>
+                <th className="py-2 text-right">{t("adminPages.usage")}</th>
+                <th className="py-2 text-right">{t("adminPages.plansCol")}</th>
+                <th className="py-2 text-right">{t("adminPages.validity")}</th>
+                <th className="py-2 text-right">{t("common.status")}</th>
+                <th className="py-2 text-right">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -158,12 +171,14 @@ export default function AdminCouponsPage() {
                     {d.code}
                   </td>
                   <td className="py-2">
-                    {d.discount_type === "percent" ? "درصدی" : "مبلغ ثابت (تومان)"}
+                    {d.discount_type === "percent"
+                      ? t("adminPages.percentType")
+                      : t("adminPages.fixedAmount")}
                   </td>
                   <td className="py-2">
                     {d.discount_type === "percent"
                       ? `${d.discount_percent}%`
-                      : `${(d.discount_amount ?? 0).toLocaleString("fa-IR")} تومان`}
+                      : `${(d.discount_amount ?? 0).toLocaleString("fa-IR")} ${t("adminPages.toman")}`}
                   </td>
                   <td className="py-2">
                     {d.used_count} / {d.max_uses || "∞"}
@@ -171,12 +186,14 @@ export default function AdminCouponsPage() {
                   <td className="py-2 text-xs">
                     {(d.plan_slugs ?? []).length
                       ? d.plan_slugs!.join(", ")
-                      : "همه پلن‌ها"}
+                      : t("adminPages.allPlans")}
                   </td>
                   <td className="py-2 text-xs text-zinc-500">
                     {formatFaDate(d.valid_from)} — {formatFaDate(d.valid_until)}
                   </td>
-                  <td className="py-2">{d.is_active ? "فعال" : "غیرفعال"}</td>
+                  <td className="py-2">
+                    {d.is_active ? t("adminPages.active") : t("adminPages.inactive")}
+                  </td>
                   <td className="py-2">
                     <button type="button" onClick={() => openEdit(d)} className="text-amber-400">
                       <Pencil className="size-4" />
@@ -194,7 +211,7 @@ export default function AdminCouponsPage() {
             </tbody>
           </table>
           {!discounts.length && !discountsQ.isLoading ? (
-            <p className="py-6 text-center text-zinc-500">کد تخفیفی تعریف نشده</p>
+            <p className="py-6 text-center text-zinc-500">{t("adminPages.noCoupons")}</p>
           ) : null}
         </div>
       </AdminPanel>
@@ -202,40 +219,40 @@ export default function AdminCouponsPage() {
       <AdminConfirmDialog
         open={open}
         onClose={() => setOpen(false)}
-        title={edit ? "ویرایش کد تخفیف" : "کد تخفیف جدید"}
-        confirmLabel="ذخیره"
+        title={edit ? t("adminPages.editCoupon") : t("adminPages.newCouponTitle")}
+        confirmLabel={t("common.save")}
         onConfirm={form.handleSubmit(onSubmit)}
       >
         <div className="max-h-[70vh] space-y-3 overflow-y-auto text-sm">
           <LabeledField
-            label="کد تخفیف"
-            hint="فقط حروف انگلیسی و عدد — مثال: SUMMER20"
+            label={t("adminPages.couponCode")}
+            hint={t("adminPages.couponCodeHint")}
             error={form.formState.errors.code?.message}
           >
             <Input dir="ltr" className="border-zinc-700 bg-zinc-950" {...form.register("code")} />
           </LabeledField>
 
           <LabeledField
-            label="توضیح داخلی (اختیاری)"
-            hint="فقط برای مدیران — روی فاکتور نمایش داده نمی‌شود"
+            label={t("adminPages.internalDesc")}
+            hint={t("adminPages.internalDescHint")}
           >
             <Input className="border-zinc-700 bg-zinc-950" {...form.register("description")} />
           </LabeledField>
 
-          <LabeledField label="نوع تخفیف">
+          <LabeledField label={t("adminPages.discountType")}>
             <div className="flex gap-2">
-              {(["percent", "fixed"] as const).map((t) => (
+              {(["percent", "fixed"] as const).map((type) => (
                 <button
-                  key={t}
+                  key={type}
                   type="button"
-                  onClick={() => form.setValue("discount_type", t)}
+                  onClick={() => form.setValue("discount_type", type)}
                   className={`flex-1 rounded-lg border px-3 py-2 ${
-                    discountType === t
+                    discountType === type
                       ? "border-amber-500 text-amber-400"
                       : "border-zinc-700 text-zinc-400"
                   }`}
                 >
-                  {t === "percent" ? "درصدی %" : "مبلغ ثابت (تومان)"}
+                  {type === "percent" ? t("adminPages.percentLabel") : t("adminPages.fixedAmount")}
                 </button>
               ))}
             </div>
@@ -243,8 +260,8 @@ export default function AdminCouponsPage() {
 
           {discountType === "percent" ? (
             <LabeledField
-              label="درصد تخفیف"
-              hint="عدد بین ۰ تا ۱۰۰"
+              label={t("adminPages.discountPercent")}
+              hint={t("adminPages.percentRange")}
               error={form.formState.errors.discount_percent?.message}
             >
               <Input
@@ -257,8 +274,8 @@ export default function AdminCouponsPage() {
             </LabeledField>
           ) : (
             <LabeledField
-              label="مبلغ تخفیف (تومان)"
-              hint="مثال: ۵۰۰۰۰ یعنی ۵۰ هزار تومان از قیمت کم می‌شود"
+              label={t("adminPages.discountAmount")}
+              hint={t("adminPages.discountAmountHint")}
               error={form.formState.errors.discount_amount?.message}
             >
               <Input
@@ -271,8 +288,8 @@ export default function AdminCouponsPage() {
           )}
 
           <LabeledField
-            label="حداکثر تعداد استفاده"
-            hint="۰ = نامحدود"
+            label={t("adminPages.maxUses")}
+            hint={t("adminPages.unlimited")}
             error={form.formState.errors.max_uses?.message}
           >
             <Input
@@ -287,7 +304,7 @@ export default function AdminCouponsPage() {
             control={form.control}
             name="valid_from"
             render={({ field }) => (
-              <LabeledField label="شروع اعتبار" error={form.formState.errors.valid_from?.message}>
+              <LabeledField label={t("adminPages.validFrom")} error={form.formState.errors.valid_from?.message}>
                 <DateTimeField value={field.value} onChange={field.onChange} />
               </LabeledField>
             )}
@@ -296,15 +313,15 @@ export default function AdminCouponsPage() {
             control={form.control}
             name="valid_until"
             render={({ field }) => (
-              <LabeledField label="پایان اعتبار" error={form.formState.errors.valid_until?.message}>
+              <LabeledField label={t("adminPages.validUntil")} error={form.formState.errors.valid_until?.message}>
                 <DateTimeField value={field.value} onChange={field.onChange} />
               </LabeledField>
             )}
           />
 
           <LabeledField
-            label="محدودیت پلن"
-            hint="کد برای کدام اشتراک‌ها قابل استفاده است؟"
+            label={t("adminPages.planRestriction")}
+            hint={t("adminPages.planRestrictionHint")}
           >
             <label className="mb-2 flex items-center gap-2">
               <input
@@ -312,7 +329,7 @@ export default function AdminCouponsPage() {
                 checked={allPlans}
                 onChange={(e) => setAllPlans(e.target.checked)}
               />
-              همه پلن‌های پولی
+              {t("adminPages.allPaidPlans")}
             </label>
             {!allPlans ? (
               <div className="space-y-1 rounded-lg border border-zinc-800 p-2">
@@ -323,7 +340,7 @@ export default function AdminCouponsPage() {
                       checked={selectedPlanSlugs.includes(p.slug)}
                       onChange={() => togglePlanSlug(p.slug)}
                     />
-                    {p.name} — {p.price.toLocaleString("fa-IR")} تومان
+                    {p.name} — {p.price.toLocaleString("fa-IR")} {t("adminPages.toman")}
                   </label>
                 ))}
               </div>
@@ -332,7 +349,7 @@ export default function AdminCouponsPage() {
 
           <label className="flex items-center gap-2">
             <input type="checkbox" {...form.register("is_active")} />
-            کد فعال است
+            {t("adminPages.couponActive")}
           </label>
         </div>
       </AdminConfirmDialog>
@@ -340,9 +357,9 @@ export default function AdminCouponsPage() {
       <AdminConfirmDialog
         open={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="حذف کد تخفیف"
+        title={t("adminPages.deleteCoupon")}
         variant="danger"
-        confirmLabel="حذف"
+        confirmLabel={t("common.delete")}
         onConfirm={async () => {
           if (deleteId) await deleteMut.mutateAsync(deleteId);
         }}

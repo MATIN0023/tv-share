@@ -1,10 +1,15 @@
 "use client";
 
 import { create } from "zustand";
+import { tStatic } from "@/lib/i18n";
+import {
+  resolveErrorMessage,
+  type ErrorContextKey,
+} from "@/lib/errors";
 
 type ToastItem = {
   id: string;
-  type: "success" | "error" | "info";
+  type: "success" | "error" | "info" | "warning";
   message: string;
 };
 
@@ -32,13 +37,32 @@ export const toast = {
     useToastStore.getState().push({ type: "success", message }),
   error: (message: string) =>
     useToastStore.getState().push({ type: "error", message }),
+  warning: (message: string) =>
+    useToastStore.getState().push({ type: "warning", message }),
   info: (message: string) =>
     useToastStore.getState().push({ type: "info", message }),
 };
 
-export function getErrorMessage(err: unknown, fallback = "خطایی رخ داد"): string {
+/** @deprecated Use showAppError or useAppError().message */
+export function getErrorMessage(
+  err: unknown,
+  fallback = tStatic("common.errorGeneric")
+): string {
   if (err && typeof err === "object" && "message" in err) {
-    return String((err as { message: string }).message);
+    return resolveErrorMessage(tStatic, err, "generic") || String((err as { message: string }).message);
   }
   return fallback;
+}
+
+/** Show a localized toast from any error + context */
+export function showAppError(
+  err: unknown,
+  context: ErrorContextKey = "generic"
+): void {
+  toast.error(resolveErrorMessage(tStatic, err, context));
+}
+
+/** Show success toast with i18n key or raw string */
+export function showSuccess(message: string): void {
+  toast.success(message);
 }

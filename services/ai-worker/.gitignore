@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Job artifacts
+data/temp/
+data/output/
+
+# IDE
+.idea/
+.vscode/

@@ -38,9 +38,12 @@ func (r *Repository) CreateRoom(ctx context.Context, name, ownerID, visibility, 
 
 func (r *Repository) SearchRooms(ctx context.Context, query string) ([]models.Room, error) {
 	filter := bson.M{
-		"$or": []bson.M{
-			{"title": bson.M{"$regex": query, "$options": "i"}},
-			{"slug": bson.M{"$regex": query, "$options": "i"}},
+		"$and": []bson.M{
+			activeRoomFilter(),
+			{"$or": []bson.M{
+				{"title": bson.M{"$regex": query, "$options": "i"}},
+				{"slug": bson.M{"$regex": query, "$options": "i"}},
+			}},
 		},
 	}
 	cur, err := r.coll(collRooms).Find(ctx, filter, options.Find().SetLimit(50).SetSort(bson.D{{Key: "created_at", Value: -1}}))
@@ -73,8 +76,18 @@ func (r *Repository) GetRoomBySlug(ctx context.Context, slug string) (*models.Ro
 	return &room, nil
 }
 
+func activeRoomFilter() bson.M {
+	return bson.M{
+		"$or": []bson.M{
+			{"status": models.RoomStatusActive},
+			{"status": bson.M{"$exists": false}},
+			{"status": ""},
+		},
+	}
+}
+
 func (r *Repository) ListRooms(ctx context.Context) ([]models.Room, error) {
-	cur, err := r.coll(collRooms).Find(ctx, bson.M{}, optionsFindDesc("created_at"))
+	cur, err := r.coll(collRooms).Find(ctx, activeRoomFilter(), optionsFindDesc("created_at"))
 	if err != nil {
 		return nil, err
 	}

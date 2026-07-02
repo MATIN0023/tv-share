@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ModalShell } from "./modal-shell";
 import { Input } from "@/components/ui/input";
 import { DateTimeField } from "@/components/forms/date-time-field";
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface CreateRoomModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ export function CreateRoomModal({
   onSubmit,
   isSubmitting = false,
 }: CreateRoomModalProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState("");
   const [isPrivate, setIsPrivate] = useState(true);
   const [startAt, setStartAt] = useState("");
@@ -42,24 +44,24 @@ export function CreateRoomModal({
     <ModalShell
       open={open}
       onClose={onClose}
-      title="ساخت اتاق جدید"
-      description="تنظیمات اتاق را مشخص کنید."
+      title={t("modals.createRoomTitle")}
+      description={t("modals.createRoomDesc")}
     >
       <div className="space-y-3">
         <Input
-          placeholder="نام اتاق"
+          placeholder={t("dashboard.roomName")}
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <DateTimeField value={startAt} onChange={setStartAt} />
         <div className="flex items-center justify-between rounded-xl border border-white/10 p-3 text-sm">
-          <span>نوع اتاق</span>
+          <span>{t("modals.roomType")}</span>
           <button
             type="button"
             onClick={() => setIsPrivate((prev) => !prev)}
             className="rounded-lg border border-white/20 px-2 py-1"
           >
-            {isPrivate ? "خصوصی" : "عمومی"}
+            {isPrivate ? t("dashboard.private") : t("dashboard.public")}
           </button>
         </div>
         <button
@@ -68,7 +70,7 @@ export function CreateRoomModal({
           onClick={handleSubmit}
           className="w-full rounded-xl bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"
         >
-          {isSubmitting ? "در حال ایجاد..." : "ایجاد اتاق"}
+          {isSubmitting ? t("modals.creatingRoom") : t("modals.createRoomBtn")}
         </button>
       </div>
     </ModalShell>

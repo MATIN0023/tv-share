@@ -1,5 +1,6 @@
 import { getAuthToken } from "./session";
 import { apiRequest, ApiError, type RequestOptions } from "./client";
+import { tStatic } from "@/lib/i18n";
 
 export async function authApiRequest<T>(
   path: string,
@@ -7,7 +8,7 @@ export async function authApiRequest<T>(
 ): Promise<T> {
   const token = getAuthToken();
   if (!token) {
-    throw new ApiError("لطفاً وارد حساب کاربری شوید", 401);
+    throw new ApiError(tStatic("errors.loginRequired"), 401);
   }
   return apiRequest<T>(path, { ...options, token });
 }

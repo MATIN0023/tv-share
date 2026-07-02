@@ -82,6 +82,7 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 	}
 	indexes := []idx{
 		{collUsers, mongo.IndexModel{Keys: bson.D{{Key: "phone_number", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_phone_number")}},
+		{collUsers, mongo.IndexModel{Keys: bson.D{{Key: "google_id", Value: 1}}, Options: options.Index().SetUnique(true).SetSparse(true).SetName("uniq_google_id")}},
 		{collOTPs, mongo.IndexModel{Keys: bson.D{{Key: "phone_number", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_otp_phone")}},
 		{collOTPs, mongo.IndexModel{Keys: bson.D{{Key: "expires_at", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(0).SetName("ttl_otp_expires")}},
 		{collVideos, mongo.IndexModel{Keys: bson.D{{Key: "uploader_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_video_uploader")}},
@@ -96,7 +97,8 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 		{collTickets, mongo.IndexModel{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_ticket_user")}},
 		{collTicketMsgs, mongo.IndexModel{Keys: bson.D{{Key: "ticket_id", Value: 1}, {Key: "created_at", Value: 1}}, Options: options.Index().SetName("idx_ticket_msg")}},
 		{collDiscounts, mongo.IndexModel{Keys: bson.D{{Key: "code", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uniq_discount_code")}},
-		{collAuditLogs, mongo.IndexModel{Keys: bson.D{{Key: "created_at", Value: -1}}, Options: options.Index().SetName("idx_audit_created")}},
+		{collMessages, mongo.IndexModel{Keys: bson.D{{Key: "room_id", Value: 1}, {Key: "timestamp", Value: 1}}, Options: options.Index().SetName("idx_message_room")}},
+		{collMessages, mongo.IndexModel{Keys: bson.D{{Key: "timestamp", Value: 1}}, Options: options.Index().SetExpireAfterSeconds(48 * 3600).SetName("ttl_message_48h")}},
 	}
 	for _, i := range indexes {
 		if _, err := r.coll(i.collection).Indexes().CreateOne(ctx, i.model); err != nil && !isIndexConflict(err) {

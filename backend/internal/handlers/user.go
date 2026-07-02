@@ -121,6 +121,8 @@ func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to update password")
 		return
 	}
+	_ = h.Repo.InvalidateUserSessions(r.Context(), uid)
+	_ = h.Repo.WriteActivityLog(r.Context(), uid, user.Role, "password_change", "user", uid, "")
 	WriteJSON(w, http.StatusOK, map[string]string{"message": "Password updated"})
 }
 

@@ -4,9 +4,11 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useTheme } from 'next-themes';
+import { useTranslation } from '@/providers/i18n-provider';
 
 const ThemeSwitch: React.FC = () => {
   const { theme, setTheme, systemTheme } = useTheme();
+  const { t } = useTranslation();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -23,7 +25,7 @@ const ThemeSwitch: React.FC = () => {
 
   return (
     <StyledWrapper>
-      <label className="bb8-toggle">
+      <label className="bb8-toggle" aria-label={t("theme.toggle")}>
         <input
           className="bb8-toggle__checkbox"
           type="checkbox"

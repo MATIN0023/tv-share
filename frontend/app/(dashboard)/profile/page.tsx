@@ -13,14 +13,21 @@ import { updateProfile } from "@/lib/api";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api";
 import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
-import { ErrorState } from "@/components/dashboard/shared/error-state";
+import { QueryError } from "@/components/dashboard/shared/query-error";
+import { showAppError } from "@/lib/toast";
 import { formatFaDate } from "@/lib/utils/format-date";
 import { activityActionLabel, targetTypeLabel } from "@/lib/activity-labels";
 import { toast } from "@/lib/toast";
+import { useTranslation } from "@/providers/i18n-provider";
+import {
+  isGoogleAuthProvider,
+  isGoogleSyntheticPhone,
+} from "@/lib/auth/google-user";
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const [passwordModal, setPasswordModal] = useState(false);
-  const { data: me, isLoading, isError, refetch } = useMe();
+  const { data: me, isLoading, isError, error, refetch } = useMe();
   const [displayName, setDisplayName] = useState("");
   const queryClient = useQueryClient();
 
@@ -36,19 +43,25 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast.success("پروفایل ذخیره شد");
     },
-    onError: () => toast.error("ذخیره پروفایل ناموفق بود"),
+    onError: (err) => showAppError(err, "profile.save"),
   });
 
   if (isLoading) return <DashboardSkeleton />;
   if (isError || !me) {
     return (
-      <ErrorState
-        title="خطا در بارگذاری پروفایل"
-        description="اتصال به سرور برقرار نشد."
+      <QueryError
+        error={error}
+        context="profile.load"
         onRetry={() => refetch()}
       />
     );
   }
+
+  const googleAccount =
+    isGoogleAuthProvider(me.auth_provider) || isGoogleSyntheticPhone(me.phone_number);
+  const displayPhone = googleAccount
+    ? me.phone?.trim() || ""
+    : me.phone_number;
 
   return (
     <div>
@@ -59,15 +72,27 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <GlassPanel title="Account" description="نام نمایشی و موبایل">
           <div className="mt-3 space-y-2">
-            <p className="text-sm text-muted-foreground" dir="ltr">
-              {me.phone_number}
-            </p>
+            {googleAccount && me.email ? (
+              <p className="text-sm text-muted-foreground" dir="ltr">
+                {me.email}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground" dir="ltr">
+                {me.phone_number}
+              </p>
+            )}
             <Input
               placeholder="نام نمایشی"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
             />
-            <PhoneInputField value={me.phone_number} />
+            {googleAccount && !displayPhone ? (
+              <p className="text-xs text-muted-foreground">
+                {t("profile.googleAddPhoneHint")}
+              </p>
+            ) : displayPhone ? (
+              <PhoneInputField value={displayPhone} />
+            ) : null}
             <button
               type="button"
               onClick={() => saveProfile.mutate()}
@@ -117,10 +142,10 @@ export default function ProfilePage() {
                   key={log.id}
                   className="rounded-xl border border-white/10 px-3 py-2 text-muted-foreground"
                 >
-                  <span className="text-foreground">{activityActionLabel(log.action)}</span>
+                  <span className="text-foreground">{activityActionLabel(t, log.action)}</span>
                   {log.target_type ? (
                     <span className="mr-2 text-xs">
-                      — {targetTypeLabel(log.target_type)}
+                      — {targetTypeLabel(t, log.target_type)}
                     </span>
                   ) : null}
                   <span className="mt-1 block text-xs">{formatFaDate(log.created_at)}</span>

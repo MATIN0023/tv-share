@@ -16,3 +16,10 @@ export * from "./activity";
 export * from "./types";
 export * from "./session";
 export { queryKeys } from "./query-keys";
+export { showAppError, showSuccess, getErrorMessage } from "@/lib/toast";
+export {
+  resolveError,
+  resolveErrorMessage,
+  type ErrorContextKey,
+  type ResolvedError,
+} from "@/lib/errors";

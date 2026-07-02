@@ -3,27 +3,32 @@
 
 import React from "react";
 import styled from "styled-components";
-import { LiquidButton } from "./ui/liquid-button";
 import { ThemeSwitch } from "./ThemeSwitch";
 import Link from "next/link";
+import { AppLogo } from "@/components/brand/app-logo";
 import { BorderMagicButton } from "@/components/ui/border-magic-button";
+import { InstallPwaButton } from "@/components/pwa/install-pwa-button";
+import { useTranslation } from "@/providers/i18n-provider";
 
 const Navbar: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <NavbarContainer>
       <div className="liquid-glass">
         <NavbarContent className="pt-6">
-          <Logo href="/">مــــــــــــوی سیـــــــنک</Logo>
+          <AppLogo href="/" size={36} name={t("common.appName")} nameClassName="text-xl" />
 
           <RightSection>
-            
+            <InstallPwaButton variant="inline" />
             <Link href="/login">
-  <BorderMagicButton>ورود</BorderMagicButton>
-</Link>
-<Link href="/signup">
-  <BorderMagicButton>ثبت‌نام</BorderMagicButton>
-</Link>
-         <ThemeSwitch /> </RightSection>
+              <BorderMagicButton>{t("common.login")}</BorderMagicButton>
+            </Link>
+            <Link href="/signup">
+              <BorderMagicButton>{t("common.signup")}</BorderMagicButton>
+            </Link>
+            <ThemeSwitch />
+          </RightSection>
         </NavbarContent>
       </div>
     </NavbarContainer>
@@ -47,35 +52,10 @@ const NavbarContent = styled.div`
   align-items: center;
 `;
 
-const Logo = styled(Link)`
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  text-decoration: none;
-
-  &:hover {
-    opacity: 0.8;
-  }
-`;
-
 const RightSection = styled.div`
   display: flex;
   align-items: center;
   gap: 1rem;
-`;
-
-const NavItem = styled(Link)`
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  text-decoration: none;
-  padding: 10px 24px;
-  border-radius: 12px;
-  transition: opacity 0.2s;
-
-  &:hover {
-    opacity: 0.7;
-  }
 `;
 
 export { Navbar };

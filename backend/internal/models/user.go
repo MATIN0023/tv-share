@@ -30,7 +30,16 @@ type User struct {
 	CreatedAt             time.Time            `bson:"created_at" json:"created_at"`
 	UpdatedAt             time.Time            `bson:"updated_at" json:"updated_at"`
 	LastLoginAt           time.Time            `bson:"last_login_at,omitempty" json:"last_login_at,omitempty"`
+	TokenVersion          int                  `bson:"token_version" json:"-"`
+	GoogleID              string               `bson:"google_id,omitempty" json:"google_id,omitempty"`
+	AuthProvider          string               `bson:"auth_provider,omitempty" json:"auth_provider,omitempty"`
 }
+
+const (
+	AuthProviderPhone  = "phone"
+	AuthProviderGoogle = "google"
+	AuthProviderBoth   = "both"
+)
 
 // OTP stores a one-time verification code for phone login / recovery.
 type OTP struct {

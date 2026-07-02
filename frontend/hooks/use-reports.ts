@@ -2,12 +2,14 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { createReport } from "@/lib/api/admin";
-import { toast, getErrorMessage } from "@/lib/toast";
+import { toast, showAppError } from "@/lib/toast";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export function useCreateReport() {
+  const { t } = useTranslation();
   return useMutation({
     mutationFn: createReport,
-    onSuccess: () => toast.success("گزارش شما ثبت شد"),
-    onError: (e) => toast.error(getErrorMessage(e, "ثبت گزارش ناموفق بود")),
+    onSuccess: () => toast.success(t("errors.reportSubmitted")),
+    onError: (e) => showAppError(e, "generic"),
   });
 }

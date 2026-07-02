@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
   AUTH_TOKEN_COOKIE,
-  isAdminRole,
-  ROLE_COOKIE,
 } from "@/lib/auth/roles";
 
 const DASHBOARD_PATHS = [
@@ -26,11 +24,10 @@ function isDashboardPath(pathname: string): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
-  const role = request.cookies.get(ROLE_COOKIE)?.value;
   const devBypass = process.env.ADMIN_DEV_BYPASS === "true";
 
   if (pathname.startsWith("/admin")) {
-    if (!isAdminRole(role) && !devBypass) {
+    if (!token && !devBypass) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.searchParams.set("redirect", pathname);

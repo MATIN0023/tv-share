@@ -7,16 +7,21 @@ import { AdminPanel } from "@/components/admin/admin-panel";
 import { AdminConfirmDialog } from "@/components/admin/confirm-dialog";
 import { PaginationBar } from "@/components/admin/pagination-bar";
 import { DebouncedSearchField } from "@/components/forms/debounced-search-field";
-import { Radio, Trash2, XCircle } from "lucide-react";
+import { Radio, Trash2, XCircle, Download } from "lucide-react";
 import {
   useAdminLiveRooms,
   useAdminRooms,
   useCloseAdminRoom,
+  useDeleteAdminRoom,
   useDeleteAdminVideo,
+  useExportAdminRoomChat,
 } from "@/hooks/use-admin";
 import { formatFaDate } from "@/lib/utils/format-date";
+import { toast } from "@/lib/toast";
+import { useTranslation } from "@/providers/i18n-provider";
 
 function RoomsContent() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const page = Number(searchParams.get("page") || "1");
@@ -43,8 +48,11 @@ function RoomsContent() {
   const liveQ = useAdminLiveRooms();
   const closeMut = useCloseAdminRoom();
   const deleteVideo = useDeleteAdminVideo();
+  const deleteRoomMut = useDeleteAdminRoom();
+  const exportChat = useExportAdminRoomChat();
 
   const [closeId, setCloseId] = useState<string | null>(null);
+  const [deleteRoomId, setDeleteRoomId] = useState<string | null>(null);
   const [deleteVideoId, setDeleteVideoId] = useState<string | null>(null);
 
   const rooms = roomsQ.data?.items ?? [];
@@ -55,11 +63,14 @@ function RoomsContent() {
   return (
     <div>
       <AdminSectionHeader
-        title="اتاق‌ها و محتوا"
-        description="مشاهده اتاق‌های زنده، مدیریت اتاق‌ها و حذف ویدیو"
+        title={t("adminPages.roomsContentTitle")}
+        description={t("adminPages.roomsContentDesc")}
       />
 
-      <AdminPanel title={`اتاق‌های زنده (${live.length})`} className="mb-4">
+      <AdminPanel
+        title={`${t("adminPages.liveRoomsCount")}${live.length})`}
+        className="mb-4"
+      >
         <div className="space-y-2">
           {live.length ? (
             live.map((room) => (
@@ -75,14 +86,14 @@ function RoomsContent() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-zinc-400">
-                  <span>{room.is_playing ? "در حال پخش" : "متوقف"}</span>
+                  <span>{room.is_playing ? t("adminPages.playing") : t("adminPages.stopped")}</span>
                   {room.video_id ? (
                     <button
                       type="button"
                       onClick={() => setDeleteVideoId(String(room.video_id))}
                       className="text-red-400"
                     >
-                      حذف ویدیو
+                      {t("adminPages.deleteVideo")}
                     </button>
                   ) : null}
                   <button
@@ -90,21 +101,21 @@ function RoomsContent() {
                     onClick={() => setCloseId(room.id)}
                     className="text-orange-400"
                   >
-                    بستن اتاق
+                    {t("adminPages.closeRoom")}
                   </button>
                 </div>
               </div>
             ))
           ) : (
-            <p className="text-zinc-500">اتاق زنده‌ای وجود ندارد</p>
+            <p className="text-zinc-500">{t("adminPages.noLiveRooms")}</p>
           )}
         </div>
       </AdminPanel>
 
-      <AdminPanel title="همه اتاق‌ها">
+      <AdminPanel title={t("adminPages.allRooms")}>
         <div className="mb-4">
           <DebouncedSearchField
-            placeholder="جستجو نام یا شناسه اتاق..."
+            placeholder={t("adminPages.searchRoom")}
             value={searchDraft}
             onDebouncedChange={applySearch}
           />
@@ -113,14 +124,14 @@ function RoomsContent() {
           <table className="w-full min-w-[900px] text-sm">
             <thead className="text-zinc-500">
               <tr>
-                <th className="py-2 text-right">شناسه</th>
-                <th className="py-2 text-right">نام</th>
-                <th className="py-2 text-right">مالک</th>
-                <th className="py-2 text-right">وضعیت</th>
-                <th className="py-2 text-right">پخش</th>
-                <th className="py-2 text-right">ویدیو</th>
-                <th className="py-2 text-right">به‌روزرسانی</th>
-                <th className="py-2 text-right">عملیات</th>
+                <th className="py-2 text-right">{t("tables.userId")}</th>
+                <th className="py-2 text-right">{t("tables.name")}</th>
+                <th className="py-2 text-right">{t("adminPages.owner")}</th>
+                <th className="py-2 text-right">{t("common.status")}</th>
+                <th className="py-2 text-right">{t("adminPages.playingCol")}</th>
+                <th className="py-2 text-right">{t("activity.targets.video")}</th>
+                <th className="py-2 text-right">{t("adminPages.updatedAt")}</th>
+                <th className="py-2 text-right">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -131,42 +142,77 @@ function RoomsContent() {
                   </td>
                   <td className="py-2">{room.name}</td>
                   <td className="py-2 font-mono text-xs" dir="ltr">
-                    {room.owner_id?.slice(-8) ?? "—"}
+                    {room.owner_id?.slice(-8) ?? t("common.dash")}
                   </td>
                   <td className="py-2">{room.status}</td>
-                  <td className="py-2">{room.is_playing ? "بله" : "خیر"}</td>
+                  <td className="py-2">{room.is_playing ? t("adminPages.yes") : t("adminPages.no")}</td>
                   <td className="py-2 font-mono text-xs" dir="ltr">
-                    {room.video_id ? room.video_id.slice(-8) : "—"}
+                    {room.video_id ? room.video_id.slice(-8) : t("common.dash")}
                   </td>
                   <td className="py-2 text-xs text-zinc-500">
                     {formatFaDate(room.updated_at)}
                   </td>
                   <td className="py-2">
-                    <button
-                      type="button"
-                      onClick={() => setCloseId(room.id)}
-                      className="text-orange-400"
-                      title="بستن اتاق"
-                    >
-                      <XCircle className="size-4" />
-                    </button>
-                    {room.video_id ? (
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setDeleteVideoId(String(room.video_id))}
-                        className="mr-2 text-red-400"
-                        title="حذف ویدیو"
+                        title={t("adminPages.exportChatZip")}
+                        onClick={async () => {
+                          try {
+                            const blob = await exportChat.mutateAsync({
+                              id: room.id,
+                              format: "csv",
+                              zip: true,
+                            });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `chat-${room.id.slice(-8)}.zip`;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            toast.success(t("adminToast.chatDownloaded"));
+                          } catch {
+                            toast.error(t("adminToast.chatDownloadFailed"));
+                          }
+                        }}
+                        className="text-zinc-400 hover:text-white"
+                      >
+                        <Download className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCloseId(room.id)}
+                        className="text-orange-400"
+                        title={t("adminPages.closeRoom")}
+                      >
+                        <XCircle className="size-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleteRoomId(room.id)}
+                        className="text-red-400"
+                        title={t("adminPages.deleteRoom")}
                       >
                         <Trash2 className="size-4" />
                       </button>
-                    ) : null}
+                      {room.video_id ? (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteVideoId(String(room.video_id))}
+                          className="text-red-400"
+                          title={t("adminPages.deleteVideo")}
+                        >
+                          <Trash2 className="size-4 opacity-60" />
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           {!rooms.length && !roomsQ.isLoading ? (
-            <p className="py-6 text-center text-zinc-500">اتاقی یافت نشد</p>
+            <p className="py-6 text-center text-zinc-500">{t("adminPages.noRoomsFound")}</p>
           ) : null}
         </div>
         <PaginationBar page={page} totalPages={totalPages} total={total} />
@@ -175,19 +221,29 @@ function RoomsContent() {
       <AdminConfirmDialog
         open={!!closeId}
         onClose={() => setCloseId(null)}
-        title="بستن اتاق"
+        title={t("adminPages.closeRoom")}
         variant="danger"
-        confirmLabel="بستن"
+        confirmLabel={t("common.close")}
         onConfirm={async () => {
           if (closeId) await closeMut.mutateAsync(closeId);
         }}
       />
       <AdminConfirmDialog
+        open={!!deleteRoomId}
+        onClose={() => setDeleteRoomId(null)}
+        title={t("adminPages.deleteRoom")}
+        variant="danger"
+        confirmLabel={t("common.delete")}
+        onConfirm={async () => {
+          if (deleteRoomId) await deleteRoomMut.mutateAsync(deleteRoomId);
+        }}
+      />
+      <AdminConfirmDialog
         open={!!deleteVideoId}
         onClose={() => setDeleteVideoId(null)}
-        title="حذف ویدیو"
+        title={t("adminPages.deleteVideo")}
         variant="danger"
-        confirmLabel="حذف"
+        confirmLabel={t("common.delete")}
         onConfirm={async () => {
           if (deleteVideoId) await deleteVideo.mutateAsync(deleteVideoId);
         }}

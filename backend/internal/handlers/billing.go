@@ -3,11 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"watch-party/internal/models"
+	"watch-party/internal/util"
 )
 
 func (h *Handler) ListPlans(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +100,7 @@ func (h *Handler) UpgradeSubscription(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusInternalServerError, "Failed to create transaction")
 		return
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), userID(r), models.RoleUser, "subscription_checkout", "plan", plan.Slug, fmt.Sprintf("%.0f", amount))
 	WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"transaction":  tx,
 		"payment_url":  fmt.Sprintf("/pay/%s", gatewayRef),
@@ -111,8 +114,25 @@ type paymentWebhookRequest struct {
 }
 
 func (h *Handler) PaymentWebhook(w http.ResponseWriter, r *http.Request) {
+	if h.PaymentWebhookSecret == "" {
+		WriteJSONError(w, http.StatusServiceUnavailable, "Payment webhook is not configured")
+		return
+	}
+
+	body, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+	if err != nil {
+		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	signature := r.Header.Get("X-Payment-Signature")
+	if !util.VerifyHMACHex(body, h.PaymentWebhookSecret, signature) {
+		WriteJSONError(w, http.StatusUnauthorized, "Invalid webhook signature")
+		return
+	}
+
 	var req paymentWebhookRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.Unmarshal(body, &req); err != nil {
 		WriteJSONError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
@@ -137,6 +157,7 @@ func (h *Handler) PaymentWebhook(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, http.StatusNotFound, "Transaction not found")
 		return
 	}
+	_ = h.Repo.WriteActivityLog(r.Context(), tx.UserID.Hex(), models.RoleUser, "subscription_upgrade", "plan", tx.PlanSlug, fmt.Sprintf("%.0f", tx.Amount))
 	WriteJSON(w, http.StatusOK, map[string]interface{}{
 		"message":     "Payment processed",
 		"transaction": tx,

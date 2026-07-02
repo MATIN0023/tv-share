@@ -6,6 +6,9 @@ import type { TicketRow } from "@/components/dashboard/tables/tickets-table";
 import type { TicketMessage } from "@/lib/api/types";
 import { useAddTicketMessage } from "@/hooks/use-tickets";
 import { formatFaDate } from "@/lib/utils/format-date";
+import { AppLoader } from "@/components/ui/app-loader";
+
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface TicketDetailModalProps {
   open: boolean;
@@ -24,6 +27,7 @@ export function TicketDetailModal({
   messages = [],
   isLoading = false,
 }: TicketDetailModalProps) {
+  const { t } = useTranslation();
   const [reply, setReply] = useState("");
   const addMessage = useAddTicketMessage();
 
@@ -33,12 +37,12 @@ export function TicketDetailModal({
     <ModalShell
       open={open}
       onClose={onClose}
-      title={`تیکت ${ticket.id.slice(-8)}`}
+      title={`${t("modals.ticketPrefix")}${ticket.id.slice(-8)}`}
       description={ticket.subject}
     >
       <div className="space-y-3 text-sm">
         {isLoading ? (
-          <p className="text-muted-foreground">در حال بارگذاری...</p>
+          <AppLoader variant="inline" className="py-4" />
         ) : (
           messages.map((m) => (
             <div
@@ -48,7 +52,7 @@ export function TicketDetailModal({
               }`}
             >
               <p className="text-xs text-muted-foreground">
-                {m.is_staff ? "پشتیبانی" : "شما"} · {formatFaDate(m.created_at)}
+                {m.is_staff ? t("modals.support") : t("modals.you")} · {formatFaDate(m.created_at)}
               </p>
               <p className="mt-2">{m.body}</p>
             </div>
@@ -57,7 +61,7 @@ export function TicketDetailModal({
         <textarea
           value={reply}
           onChange={(e) => setReply(e.target.value)}
-          placeholder="پاسخ شما..."
+          placeholder={t("modals.replyPlaceholder")}
           rows={3}
           className="w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none"
         />
@@ -72,7 +76,7 @@ export function TicketDetailModal({
           }}
           className="w-full rounded-xl bg-primary px-3 py-2 text-sm text-white disabled:opacity-50"
         >
-          ارسال پاسخ
+          {t("modals.sendReply")}
         </button>
       </div>
     </ModalShell>

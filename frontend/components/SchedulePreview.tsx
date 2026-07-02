@@ -4,9 +4,11 @@ import { CalendarDays, Clock3, Users } from "lucide-react";
 import { motion } from "framer-motion";
 import { DateTimeField } from "@/components/forms/date-time-field";
 import { useState } from "react";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export function SchedulePreview() {
   const [scheduledAt, setScheduledAt] = useState("");
+  const { t } = useTranslation();
 
   return (
     <section className="px-4 pb-20">
@@ -17,27 +19,27 @@ export function SchedulePreview() {
           viewport={{ once: true }}
           className="text-2xl font-bold md:text-3xl"
         >
-          زمان‌بندی فارسی واچ‌پارتی
+          {t("schedule.title")}
         </motion.h3>
         <p className="mt-2 text-sm leading-7 text-muted-foreground md:text-base">
-          تاریخ و ساعت را با تقویم شمسی انتخاب کن، لینک دعوت بساز و برای دوستانت بفرست.
+          {t("schedule.desc")}
         </p>
 
         <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-2xl border border-white/10 p-4">
             <CalendarDays className="size-5 text-primary" />
-            <p className="mt-2 font-medium">تقویم شمسی</p>
-            <p className="mt-1 text-xs text-muted-foreground">انتخاب تاریخ دقیق فارسی</p>
+            <p className="mt-2 font-medium">{t("schedule.persianCalendar")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("schedule.selectDate")}</p>
           </div>
           <div className="rounded-2xl border border-white/10 p-4">
             <Clock3 className="size-5 text-primary" />
-            <p className="mt-2 font-medium">زمان‌بندی هوشمند</p>
-            <p className="mt-1 text-xs text-muted-foreground">اعلان قبل از شروع واچ‌پارتی</p>
+            <p className="mt-2 font-medium">{t("schedule.smartSchedule")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("schedule.notifyBefore")}</p>
           </div>
           <div className="rounded-2xl border border-white/10 p-4">
             <Users className="size-5 text-primary" />
-            <p className="mt-2 font-medium">دعوت گروهی</p>
-            <p className="mt-1 text-xs text-muted-foreground">ارسال لینک به دوستان</p>
+            <p className="mt-2 font-medium">{t("schedule.groupInvite")}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("schedule.sendLink")}</p>
           </div>
         </div>
 

@@ -25,6 +25,7 @@ type Message struct {
 	IsPlaying   bool         `json:"is_playing,omitempty"`
 	CurrentTime float64      `json:"current_time,omitempty"`
 	Duration    float64      `json:"duration,omitempty"`
+	Emoji       string       `json:"emoji,omitempty"`
 	UserInfo    *UserInfo    `json:"user_info,omitempty"`
 	RoomInfo    *models.Room `json:"room_info,omitempty"`
 }

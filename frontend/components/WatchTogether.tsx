@@ -1,32 +1,38 @@
 // components/WatchTogether.tsx (نسخه کامل)
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export function WatchTogether() {
-  const features = [
-    {
-      icon: "👥",
-      title: "تماشای گروهی",
-      description: "تا ۱۰ نفر همزمان",
-    },
-    {
-      icon: "💬",
-      title: "چت زنده",
-      description: "گفتگو در حین تماشا",
-    },
-    {
-      icon: "😊",
-      title: "واکنش‌های لحظه‌ای",
-      description: "ایموجی و استیکر",
-    },
-    {
-      icon: "🎬",
-      title: "کنترل مشترک",
-      description: "پخش، توقف و جابجایی",
-    },
-  ];
+  const { t } = useTranslation();
+
+  const features = useMemo(
+    () => [
+      {
+        icon: "👥",
+        title: t("landing.featureGroupWatch"),
+        description: t("landing.featureGroupWatchDesc"),
+      },
+      {
+        icon: "💬",
+        title: t("landing.featureLiveChat"),
+        description: t("landing.featureLiveChatDesc"),
+      },
+      {
+        icon: "😊",
+        title: t("landing.featureReactions"),
+        description: t("landing.featureReactionsDesc"),
+      },
+      {
+        icon: "🎬",
+        title: t("landing.featureSharedControl"),
+        description: t("landing.featureSharedControlDesc"),
+      },
+    ],
+    [t]
+  );
 
   return (
     <div className="flex flex-col overflow-hidden py-10">
@@ -39,20 +45,19 @@ export function WatchTogether() {
               transition={{ duration: 0.5 }}
               className="text-4xl md:text-6xl lg:text-7xl font-bold text-black dark:text-white"
             >
-              تماشای فیلم با{" "}
+              {t("landing.watchTogetherTitle")}{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-red-500">
-                دوستان و عزیزانت
+                {t("landing.watchTogetherHighlight")}
               </span>
             </motion.h1>
-            
+
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto"
             >
-              فاصله‌ها مهم نیست! با کسایی که دوستشون داری، هر لحظه‌ای رو به
-              اشتراک بذار. تماشای همزمان، چت زنده و واکنش‌های لحظه‌ای
+              {t("landing.watchTogetherDesc")}
             </motion.p>
 
             <motion.div
@@ -79,12 +84,9 @@ export function WatchTogether() {
           </div>
         }
       >
-        {/* تصویر یا ویدیو Demo */}
         <div className="relative w-full h-full bg-gradient-to-br from-purple-600 via-pink-600 to-red-600 rounded-2xl overflow-hidden">
-          {/* Overlay */}
           <div className="absolute inset-0 bg-black/30" />
-          
-          {/* محتوای داخل */}
+
           <div className="relative z-10 h-full flex flex-col items-center justify-center p-8 text-white">
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
@@ -100,14 +102,13 @@ export function WatchTogether() {
                 <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" />
               </svg>
               <h3 className="text-3xl md:text-4xl font-bold mb-4">
-                تجربه تماشای همزمان
+                {t("landing.syncExperienceTitle")}
               </h3>
               <p className="text-lg opacity-90 max-w-md mx-auto">
-                با دوستان، خانواده یا کاپل‌ها، هر لحظه رو با هم زندگی کنید
+                {t("landing.syncExperienceDesc")}
               </p>
             </motion.div>
 
-            {/* آواتارهای کاربران (نمایشی) */}
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}

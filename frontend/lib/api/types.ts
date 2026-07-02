@@ -85,11 +85,26 @@ export type UserProfile = {
   avatar_url?: string;
   role: string;
   email?: string;
+  auth_provider?: string;
+  phone?: string;
   bio?: string;
   subscription_plan?: string;
   subscription_expires_at?: string;
   is_active?: boolean;
   created_at: string;
+};
+
+export type DailyCount = {
+  date: string;
+  count: number;
+};
+
+export type AdminFunnel = {
+  total_users: number;
+  users_with_room: number;
+  users_with_video: number;
+  users_with_friend: number;
+  paid_users: number;
 };
 
 export type AdminStats = {
@@ -103,6 +118,24 @@ export type AdminStats = {
   open_reports: number;
   open_tickets: number;
   premium_users: number;
+  new_users_today: number;
+  new_users_7d: number;
+  new_users_30d: number;
+  active_users_7d: number;
+  active_users_30d: number;
+  logins_today: number;
+  free_users: number;
+  google_auth_users: number;
+  total_revenue: number;
+  revenue_30d: number;
+  completed_payments: number;
+  failed_payments: number;
+  pending_friend_requests: number;
+  total_friendships: number;
+  rooms_created_7d: number;
+  videos_uploaded_7d: number;
+  signup_trend: DailyCount[];
+  funnel: AdminFunnel;
 };
 
 export type Plan = {
@@ -198,11 +231,17 @@ export type Room = {
   id: string;
   name: string;
   owner_id: string;
+  slug?: string;
   visibility: string;
   status?: string;
   is_playing?: boolean;
+  is_paused?: boolean;
+  current_time?: number;
+  duration?: number;
   video_path?: string;
   created_at: string;
+  invite_code?: string;
+  invite_expires?: string;
 };
 
 export type Friend = {
@@ -276,4 +315,6 @@ export type WsMessage = {
   is_playing?: boolean;
   current_time?: number;
   duration?: number;
+  emoji?: string;
+  room_info?: Room;
 };

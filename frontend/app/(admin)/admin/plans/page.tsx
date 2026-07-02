@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,18 +17,25 @@ import {
   useCreateAdminPlan,
   useUpdateAdminPlan,
 } from "@/hooks/use-admin";
-import { adminPlanSchema, type AdminPlanForm } from "@/lib/validations/admin";
+import {
+  createAdminSchemas,
+  type AdminPlanForm,
+} from "@/lib/validations/create-admin-schemas";
 import { formatFaDate } from "@/lib/utils/format-date";
 import { slugify } from "@/lib/utils/slugify";
 import type { Plan } from "@/lib/api/types";
+import { useTranslation } from "@/providers/i18n-provider";
 
 function PlansPageContent() {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const page = Number(searchParams.get("page") || "1");
   const [tab, setTab] = useState<"plans" | "invoices">("plans");
   const [togglePlan, setTogglePlan] = useState<Plan | null>(null);
   const [editPlan, setEditPlan] = useState<Plan | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+
+  const schemas = useMemo(() => createAdminSchemas(t), [t]);
 
   const plansQ = useAdminPlans();
   const txQ = useAdminTransactions({ page, limit: 15 });
@@ -41,7 +48,7 @@ function PlansPageContent() {
   const totalPages = Math.max(1, Math.ceil(total / 15));
 
   const form = useForm<AdminPlanForm>({
-    resolver: zodResolver(adminPlanSchema),
+    resolver: zodResolver(schemas.adminPlanSchema),
     defaultValues: {
       slug: "",
       name: "",
@@ -94,8 +101,8 @@ function PlansPageContent() {
   return (
     <div>
       <AdminSectionHeader
-        title="پلن‌ها و فاکتورها"
-        description="مدیریت اشتراک‌ها و مشاهده فاکتورهای پرداخت"
+        title={t("adminPages.plansTitle")}
+        description={t("adminPages.plansDesc")}
         action={
           tab === "plans" ? (
             <button
@@ -115,23 +122,23 @@ function PlansPageContent() {
               className="inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-zinc-950"
             >
               <Plus className="size-4" />
-              پلن جدید
+              {t("adminPages.newPlan")}
             </button>
           ) : null
         }
       />
 
       <div className="mb-4 flex gap-2">
-        {(["plans", "invoices"] as const).map((t) => (
+        {(["plans", "invoices"] as const).map((tabKey) => (
           <button
-            key={t}
+            key={tabKey}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => setTab(tabKey)}
             className={`rounded-lg border px-3 py-2 text-sm ${
-              tab === t ? "border-amber-500 text-amber-500" : "border-zinc-700"
+              tab === tabKey ? "border-amber-500 text-amber-500" : "border-zinc-700"
             }`}
           >
-            {t === "plans" ? "پلن‌ها" : "فاکتورها"}
+            {tabKey === "plans" ? t("adminPages.plans") : t("adminPages.invoices")}
           </button>
         ))}
       </div>
@@ -146,12 +153,12 @@ function PlansPageContent() {
                     <p className="text-lg font-semibold">{plan.name}</p>
                     {plan.slug === "free" ? (
                       <span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">
-                        پایه
+                        {t("adminPages.basic")}
                       </span>
                     ) : null}
                     {!plan.is_active ? (
                       <span className="rounded bg-red-900/40 px-2 py-0.5 text-xs text-red-300">
-                        غیرفعال
+                        {t("adminPages.inactive")}
                       </span>
                     ) : null}
                   </div>
@@ -159,10 +166,11 @@ function PlansPageContent() {
                     {plan.price.toLocaleString("fa-IR")} {plan.currency}
                   </p>
                   <p className="text-sm text-zinc-500">
-                    {plan.duration_days} روز · {plan.slug}
+                    {plan.duration_days} {t("adminPages.days")}
+                    {plan.slug}
                   </p>
                   <p className="mt-2 text-xs text-zinc-400">
-                    {(plan.features ?? []).join(" · ") || "—"}
+                    {(plan.features ?? []).join(" · ") || t("common.dash")}
                   </p>
                 </div>
                 <div className="flex gap-1">
@@ -179,7 +187,7 @@ function PlansPageContent() {
                     className={`rounded p-2 hover:bg-zinc-800 ${
                       plan.is_active ? "text-emerald-500" : "text-zinc-600"
                     }`}
-                    title={plan.is_active ? "غیرفعال کردن" : "فعال کردن"}
+                    title={plan.is_active ? t("adminPages.deactivate") : t("adminPages.activate")}
                   >
                     <Power className="size-4" />
                   </button>
@@ -193,30 +201,30 @@ function PlansPageContent() {
           <table className="w-full text-sm">
             <thead className="text-zinc-500">
               <tr>
-                <th className="py-2 text-right">شماره فاکتور</th>
-                <th className="py-2 text-right">مبلغ</th>
-                <th className="py-2 text-right">تخفیف</th>
-                <th className="py-2 text-right">وضعیت</th>
-                <th className="py-2 text-right">پلن</th>
-                <th className="py-2 text-right">تاریخ</th>
+                <th className="py-2 text-right">{t("adminPages.invoiceNumber")}</th>
+                <th className="py-2 text-right">{t("tables.amount")}</th>
+                <th className="py-2 text-right">{t("adminPages.discount")}</th>
+                <th className="py-2 text-right">{t("common.status")}</th>
+                <th className="py-2 text-right">{t("adminPages.plan")}</th>
+                <th className="py-2 text-right">{t("common.date")}</th>
               </tr>
             </thead>
             <tbody>
-              {invoices.map((t) => (
-                <tr key={t.id} className="border-t border-zinc-800">
+              {invoices.map((inv) => (
+                <tr key={inv.id} className="border-t border-zinc-800">
                   <td className="py-2 font-mono text-xs" dir="ltr">
-                    {t.gateway_reference}
+                    {inv.gateway_reference}
                   </td>
-                  <td className="py-2">{t.amount.toLocaleString("fa-IR")}</td>
+                  <td className="py-2">{inv.amount.toLocaleString("fa-IR")}</td>
                   <td className="py-2">
-                    {t.discount_code
-                      ? `${t.discount_code} (${(t.discount_amount ?? 0).toLocaleString("fa-IR")})`
-                      : "—"}
+                    {inv.discount_code
+                      ? `${inv.discount_code} (${(inv.discount_amount ?? 0).toLocaleString("fa-IR")})`
+                      : t("common.dash")}
                   </td>
-                  <td className="py-2">{t.status}</td>
-                  <td className="py-2">{t.plan_slug ?? "—"}</td>
+                  <td className="py-2">{inv.status}</td>
+                  <td className="py-2">{inv.plan_slug ?? t("common.dash")}</td>
                   <td className="py-2 text-xs text-zinc-500">
-                    {formatFaDate(t.created_at)}
+                    {formatFaDate(inv.created_at)}
                   </td>
                 </tr>
               ))}
@@ -229,10 +237,19 @@ function PlansPageContent() {
       <AdminConfirmDialog
         open={!!togglePlan}
         onClose={() => setTogglePlan(null)}
-        title={togglePlan?.is_active ? "غیرفعال کردن پلن" : "فعال کردن پلن"}
-        description={`پلن «${togglePlan?.name}» ${togglePlan?.is_active ? "غیرفعال" : "فعال"} شود؟`}
+        title={
+          togglePlan?.is_active
+            ? t("adminPages.deactivatePlan")
+            : t("adminPages.activatePlan")
+        }
+        description={t("adminPages.planToggleConfirm", {
+          name: togglePlan?.name ?? "",
+          action: togglePlan?.is_active
+            ? t("adminPages.deactivated")
+            : t("adminPages.activated"),
+        })}
         variant={togglePlan?.is_active ? "danger" : "primary"}
-        confirmLabel="تأیید"
+        confirmLabel={t("common.confirm")}
         onConfirm={async () => {
           if (!togglePlan) return;
           await updateMut.mutateAsync({
@@ -248,42 +265,42 @@ function PlansPageContent() {
           setCreateOpen(false);
           setEditPlan(null);
         }}
-        title={editPlan ? "ویرایش پلن" : "پلن جدید"}
-        confirmLabel="ذخیره"
+        title={editPlan ? t("adminPages.editPlan") : t("adminPages.newPlan")}
+        confirmLabel={t("common.save")}
         onConfirm={form.handleSubmit(submitPlan)}
       >
         <div className="max-h-[70vh] space-y-3 overflow-y-auto text-sm">
           <LabeledField
-            label="نام پلن"
-            hint="عنوانی که کاربر در صفحه اشتراک می‌بیند — مثال: پریمیوم ماهانه"
+            label={t("adminPages.planName")}
+            hint={t("adminPages.planNameHint")}
             error={form.formState.errors.name?.message}
           >
             <Input className="border-zinc-700 bg-zinc-950" {...form.register("name")} />
           </LabeledField>
 
           <LabeledField
-            label="شناسه پلن (slug)"
-            hint="به‌صورت خودکار از نام ساخته می‌شود — در API و کدهای تخفیف استفاده می‌شود"
+            label={t("adminPages.planSlug")}
+            hint={t("adminPages.planSlugHint")}
           >
             <Input
               dir="ltr"
               disabled
               className="border-zinc-700 bg-zinc-950 text-zinc-400"
-              value={slugPreview || "—"}
+              value={slugPreview || t("common.dash")}
               readOnly
             />
           </LabeledField>
 
           <LabeledField
-            label="توضیح کوتاه"
-            hint="یک جمله بازاریابی زیر نام پلن — مثال: «تمام امکانات بدون محدودیت»"
+            label={t("adminPages.shortDesc")}
+            hint={t("adminPages.shortDescHint")}
           >
             <Input className="border-zinc-700 bg-zinc-950" {...form.register("description")} />
           </LabeledField>
 
           <LabeledField
-            label="قیمت (تومان)"
-            hint="مبلغی که کاربر برای خرید این اشتراک می‌پردازد"
+            label={t("adminPages.priceToman")}
+            hint={t("adminPages.priceHint")}
             error={form.formState.errors.price?.message}
           >
             <Input
@@ -295,8 +312,8 @@ function PlansPageContent() {
           </LabeledField>
 
           <LabeledField
-            label="مدت اشتراک (روز)"
-            hint="مثال: ۳۰ یعنی یک ماهه"
+            label={t("adminPages.durationDays")}
+            hint={t("adminPages.durationHint")}
             error={form.formState.errors.duration_days?.message}
           >
             <Input
@@ -308,15 +325,15 @@ function PlansPageContent() {
           </LabeledField>
 
           <LabeledField
-            label="ویژگی‌ها"
-            hint="لیست مزایا که روی کارت پلن نمایش داده می‌شود — هر مورد را با کاما جدا کنید. مثال: ویدیو نامحدود, اتاق خصوصی, بدون تبلیغ"
+            label={t("adminPages.features")}
+            hint={t("adminPages.featuresHint")}
           >
             <Input className="border-zinc-700 bg-zinc-950" {...form.register("features")} />
           </LabeledField>
 
           <label className="flex items-center gap-2">
             <input type="checkbox" {...form.register("is_active")} />
-            پلن فعال و قابل خرید است
+            {t("adminPages.planActiveHint")}
           </label>
         </div>
       </AdminConfirmDialog>

@@ -1,16 +1,19 @@
-import Hero from '@/components/Hero'
-import { WatchTogether } from '@/components/WatchTogether'
-import { Features } from '@/components/Features'
-import React from 'react'
+import { HeroSection } from "@/components/landing/hero-section";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { StatsSection } from "@/components/landing/stats-section";
+import { PricingSection } from "@/components/landing/pricing-section";
+import { CtaSection } from "@/components/landing/cta-section";
+import { Features } from "@/components/Features";
 
-const page = () => {
+export default function LandingPage() {
   return (
-    <div>
-      <Hero />
-      <WatchTogether />
+    <>
+      <HeroSection />
+      <HowItWorks />
+      <StatsSection />
       <Features />
-    </div>
-  )
+      <PricingSection />
+      <CtaSection />
+    </>
+  );
 }
-
-export default page

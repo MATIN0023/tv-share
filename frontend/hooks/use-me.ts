@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { getMe, queryKeys, getAuthToken } from "@/lib/api";
+import { getMe, queryKeys, getAuthToken, syncRoleCookie } from "@/lib/api";
 
 export function useMe() {
   const hasToken =
@@ -9,7 +9,12 @@ export function useMe() {
 
   return useQuery({
     queryKey: queryKeys.me,
-    queryFn: getMe,
+    queryFn: async () => {
+      const me = await getMe();
+      syncRoleCookie(me.role);
+      return me;
+    },
     enabled: hasToken,
+    retry: false,
   });
 }

@@ -57,3 +57,7 @@ func (r *Repository) GetMessages(ctx context.Context, roomID string, limit int64
 	}
 	return msgs, nil
 }
+
+func (r *Repository) GetAllMessagesForRoom(ctx context.Context, roomID string) ([]models.Message, error) {
+	return r.GetMessages(ctx, roomID, 50000)
+}

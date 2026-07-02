@@ -1,11 +1,3 @@
-// @title Watch Party API
-// @version 1.0
-// @description JSON API and WebSocket backend for TV Share watch parties.
-// @host localhost:8090
-// @BasePath /
-// @securityDefinitions.apikey BearerAuth
-// @in header
-// @name Authorization
 package main
 
 import (
@@ -20,6 +12,8 @@ import (
 	"watch-party/internal/auth"
 	"watch-party/internal/config"
 	"watch-party/internal/handlers"
+	"watch-party/internal/ratelimit"
+	"watch-party/internal/redis"
 	"watch-party/internal/repository"
 	"watch-party/internal/routes"
 	"watch-party/internal/ws"
@@ -34,19 +28,24 @@ func main() {
 		log.Fatal("Failed to connect to MongoDB:", err)
 	}
 
-	if err := repo.EnsureDefaultUser(ctx); err != nil {
-		log.Printf("Default user setup: %v", err)
+	if cfg.DevSeedUsers {
+		if err := repo.EnsureDefaultUser(ctx, cfg.DevAdminPhone, cfg.DevAdminPassword, cfg.DevTestUserPhone, cfg.DevTestUserPassword); err != nil {
+			log.Printf("Dev user seed: %v", err)
+		}
 	}
 	if err := repo.EnsureDefaultPlans(ctx); err != nil {
 		log.Printf("Default plans setup: %v", err)
 	}
 
+	redis.Connect(cfg.RedisURL)
+
 	jwtAuth := auth.NewJWT(cfg.JWTSecret)
-	authHandler := auth.NewHandler(repo, jwtAuth)
+	otpLimiter := ratelimit.New(3, time.Hour)
+	authHandler := auth.NewHandler(repo, jwtAuth, otpLimiter)
 	hub := ws.NewHub(repo)
 	go hub.Run()
 
-	h := handlers.New(repo, hub, jwtAuth)
+	h := handlers.New(repo, hub, jwtAuth, cfg.PaymentWebhookSecret, cfg.GoogleClientID, cfg.AssistantServiceURL)
 	router := routes.New(h, authHandler, hub, jwtAuth, repo)
 
 	srv := &http.Server{Addr: cfg.Addr, Handler: router}

@@ -10,19 +10,43 @@ JSON API and WebSocket backend (Go modular monolith + MongoDB).
 | Login | `POST /auth/login` | `{ "phone_number", "password" }` |
 | Request OTP | `POST /auth/otp/request` | `{ "phone_number" }` |
 | Verify OTP | `POST /auth/otp/verify` | `{ "phone_number", "code" }` |
+| Google sign-in | `POST /auth/google` | `{ "id_token" }` — email/name from Google token (see [docs/GOOGLE_OAUTH.md](../docs/GOOGLE_OAUTH.md)) |
 
 - **Primary identifier:** Iranian mobile `09XXXXXXXXX`
 - **Password hashing:** bcrypt cost 10 (`golang.org/x/crypto/bcrypt`)
 - **OTP:** 5-digit code, 5-minute TTL, logged to server console (simulated SMS)
 - **JWT:** HS256, 24h expiry, `Authorization: Bearer <token>`
+- **WebSocket:** connect with `?token=<JWT>` (no anonymous `user_id` query param)
 
-### Default dev account (seeded on startup)
+### Environment variables
 
-| Field | Value |
-|-------|-------|
-| Phone | `09123456789` |
-| Password | `Admin123` |
-| Role | `admin` |
+Copy `.env.example` to `.env` in the `backend/` folder (loaded automatically on startup). Required in production:
+
+| Variable | Purpose |
+|----------|---------|
+| `JWT_SECRET` | Signs session tokens (required unless `DEV_MODE=true`) |
+| `PAYMENT_WEBHOOK_SECRET` | HMAC key for `X-Payment-Signature` on payment webhooks |
+
+Optional dev seeding (`DEV_SEED_USERS=true`):
+
+| Variable | Purpose |
+|----------|---------|
+| `DEV_ADMIN_PHONE` / `DEV_ADMIN_PASSWORD` | Creates admin user on startup |
+| `DEV_TEST_USER_PHONE` / `DEV_TEST_USER_PASSWORD` | Creates test user on startup |
+
+### Rate limits
+
+| Endpoint | Limit |
+|----------|-------|
+| `POST /auth/login` | 10 / minute / IP |
+| `POST /auth/register` | 5 / minute / IP |
+| `POST /auth/otp/request` | 3 / hour / phone, 20 / minute / IP |
+| `POST /auth/otp/verify` | 15 / minute / IP |
+| WebSocket chat | 20 / minute / user |
+
+### Payment webhook
+
+`POST /api/payment/webhook` requires header `X-Payment-Signature: <hex HMAC-SHA256 of raw body>` using `PAYMENT_WEBHOOK_SECRET`.
 
 ## User dashboard API
 

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface RoomRow {
   id: string;
@@ -13,16 +16,18 @@ interface RoomsTableProps {
 }
 
 export function RoomsTable({ rows }: RoomsTableProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="overflow-hidden rounded-2xl border border-white/10">
       <table className="w-full text-sm">
         <thead className="bg-white/5 text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 text-right">اتاق</th>
-            <th className="px-3 py-2 text-right">اعضا</th>
-            <th className="px-3 py-2 text-right">وضعیت</th>
-            <th className="px-3 py-2 text-right">زمان</th>
-            <th className="px-3 py-2 text-right">ورود</th>
+            <th className="px-3 py-2 text-right">{t("tables.room")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.members")}</th>
+            <th className="px-3 py-2 text-right">{t("common.status")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.time")}</th>
+            <th className="px-3 py-2 text-right">{t("tables.enter")}</th>
           </tr>
         </thead>
         <tbody>
@@ -31,13 +36,15 @@ export function RoomsTable({ rows }: RoomsTableProps) {
               <td className="px-3 py-2">{row.name}</td>
               <td className="px-3 py-2">{row.members}</td>
               <td className="px-3 py-2 text-primary">{row.status}</td>
-              <td className="px-3 py-2 text-muted-foreground">{row.startAt ?? "-"}</td>
+              <td className="px-3 py-2 text-muted-foreground">
+                {row.startAt ?? t("common.dash")}
+              </td>
               <td className="px-3 py-2">
                 <Link
                   href={`/rooms/${row.id}`}
                   className="text-primary hover:underline"
                 >
-                  ورود
+                  {t("tables.enter")}
                 </Link>
               </td>
             </tr>

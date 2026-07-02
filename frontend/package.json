@@ -4,15 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "node scripts/generate-pwa-icons.mjs && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "pwa:icons": "node scripts/generate-pwa-icons.mjs",
+    "logo:process": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-slot": "^1.2.4",
+    "@react-oauth/google": "^0.12.1",
     "@tabler/icons-react": "^3.44.0",
     "@tanstack/react-query": "^5.100.10",
     "@tanstack/react-query-devtools": "^5.100.10",
@@ -42,6 +46,7 @@
     "eslint": "^9.0.0",
     "eslint-config-next": "^15.1.6",
     "postcss": "^8.4.49",
+    "sharp": "^0.35.2",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"
   }

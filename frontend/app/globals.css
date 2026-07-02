@@ -25,8 +25,7 @@
     --input: 220 13% 91%;
     --ring: 262.1 83.3% 57.8%;
     --radius: 0.5rem;
-    
-    /* متغیرهای سفارشی برای تم روشن */
+    --font-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif;
     --nav-bg-rgb: 255, 255, 255;
     --text-primary: #1a1a1a;
     --text-secondary: #666666;

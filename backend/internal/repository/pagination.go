@@ -152,15 +152,26 @@ func (r *Repository) ListTransactionsPaginated(ctx context.Context, page, limit 
 	return &models.PaginatedResult[models.Transaction]{Items: txs, Total: total, Page: page, Limit: limit}, nil
 }
 
-func (r *Repository) ListAuditLogsPaginated(ctx context.Context, page, limit int) (*models.PaginatedResult[models.AuditLog], error) {
+func (r *Repository) ListAuditLogsPaginated(ctx context.Context, page, limit int, roleFilter string) (*models.PaginatedResult[models.AuditLog], error) {
 	page, limit = parsePageLimit(page, limit)
-	total, err := r.coll(collAuditLogs).CountDocuments(ctx, bson.M{})
+	filter := bson.M{}
+	switch roleFilter {
+	case "admin":
+		filter["actor_role"] = bson.M{"$in": []string{models.RoleAdmin, models.RoleSuperAdmin}}
+	case "user":
+		filter["$or"] = []bson.M{
+			{"actor_role": models.RoleUser},
+			{"actor_role": ""},
+			{"actor_role": bson.M{"$exists": false}},
+		}
+	}
+	total, err := r.coll(collAuditLogs).CountDocuments(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 	skip := int64((page - 1) * limit)
 	opts := options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}).SetSkip(skip).SetLimit(int64(limit))
-	cur, err := r.coll(collAuditLogs).Find(ctx, bson.M{}, opts)
+	cur, err := r.coll(collAuditLogs).Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
 	}

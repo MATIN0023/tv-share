@@ -15,7 +15,7 @@ import {
 import { CreateTicketModal } from "@/components/dashboard/modals/create-ticket-modal";
 import { TicketDetailModal } from "@/components/dashboard/modals/ticket-detail-modal";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
-import { ErrorState } from "@/components/dashboard/shared/error-state";
+import { QueryError } from "@/components/dashboard/shared/query-error";
 import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
 import {
   useCreateTicket,
@@ -23,25 +23,34 @@ import {
   useTickets,
 } from "@/hooks/use-tickets";
 import { useCreateReport } from "@/hooks/use-reports";
+import { usePublicSettings } from "@/hooks/use-public-settings";
 import { useUsers } from "@/hooks/use-friends";
 import { useRooms } from "@/hooks/use-rooms";
 import { useVideos } from "@/hooks/use-videos";
-import { userReportSchema } from "@/lib/validations/admin";
+import { createAdminSchemas } from "@/lib/validations/create-admin-schemas";
 import { formatFaDate } from "@/lib/utils/format-date";
+import { targetTypeLabel } from "@/lib/activity-labels";
+import { useTranslation } from "@/providers/i18n-provider";
+
+const REPORT_TARGET_TYPES = ["user", "room", "video", "message"] as const;
 
 export default function SupportPage() {
+  const { t } = useTranslation();
   const [createOpen, setCreateOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<"all" | TicketStatus>("all");
 
   const ticketsQ = useTickets();
+  const settingsQ = usePublicSettings();
   const createMut = useCreateTicket();
   const reportMut = useCreateReport();
   const detailQ = useTicket(selectedId);
   const usersQ = useUsers();
   const roomsQ = useRooms();
   const videosQ = useVideos();
+
+  const { userReportSchema } = useMemo(() => createAdminSchemas(t), [t]);
 
   const reportForm = useForm({
     resolver: zodResolver(userReportSchema),
@@ -84,28 +93,62 @@ export default function SupportPage() {
   return (
     <div>
       <SectionHeader
-        title="پشتیبانی"
-        description="تیکت پشتیبانی و گزارش تخلف"
+        title={t("dashboard.supportTitle")}
+        description={t("dashboard.supportPageDesc")}
       />
 
+      {settingsQ.data ? (
+        <GlassPanel title={t("dashboard.contactMethods")} className="mb-4">
+          <div className="mt-2 flex flex-wrap gap-6 text-sm">
+            {settingsQ.data.support_email ? (
+              <div>
+                <span className="text-muted-foreground">{t("dashboard.emailPrefix")}</span>
+                <a
+                  href={`mailto:${settingsQ.data.support_email}`}
+                  className="text-primary"
+                  dir="ltr"
+                >
+                  {settingsQ.data.support_email}
+                </a>
+              </div>
+            ) : null}
+            {settingsQ.data.support_phone ? (
+              <div>
+                <span className="text-muted-foreground">{t("dashboard.phonePrefix")}</span>
+                <span dir="ltr">{settingsQ.data.support_phone}</span>
+              </div>
+            ) : null}
+            {!settingsQ.data.support_email && !settingsQ.data.support_phone ? (
+              <p className="text-muted-foreground">
+                {t("dashboard.contactNotConfigured")}
+              </p>
+            ) : null}
+          </div>
+        </GlassPanel>
+      ) : null}
+
       {ticketsQ.isError ? (
-        <ErrorState title="خطا در دریافت تیکت‌ها" onRetry={() => ticketsQ.refetch()} />
+        <QueryError
+          error={ticketsQ.error}
+          context="tickets.load"
+          onRetry={() => ticketsQ.refetch()}
+        />
       ) : null}
 
       <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-3 md:mb-6">
-        <GlassPanel title="باز">
+        <GlassPanel title={t("dashboard.open")}>
           <p className="text-2xl font-bold text-amber-400">{openCount}</p>
         </GlassPanel>
-        <GlassPanel title="کل">
+        <GlassPanel title={t("dashboard.total")}>
           <p className="text-2xl font-bold">{tickets.length}</p>
         </GlassPanel>
-        <GlassPanel title="جدید">
+        <GlassPanel title={t("dashboard.new")}>
           <button
             type="button"
             onClick={() => setCreateOpen(true)}
             className="mt-1 rounded-xl bg-primary px-3 py-2 text-sm text-white"
           >
-            ثبت تیکت
+            {t("dashboard.createTicket")}
           </button>
         </GlassPanel>
       </div>
@@ -113,11 +156,11 @@ export default function SupportPage() {
       <div className="mb-4 flex flex-wrap gap-2 md:mb-6">
         {(
           [
-            { key: "all", label: "همه" },
-            { key: "open", label: "باز" },
-            { key: "pending", label: "انتظار" },
-            { key: "resolved", label: "حل‌شده" },
-            { key: "closed", label: "بسته" },
+            { key: "all", label: t("common.all") },
+            { key: "open", label: t("dashboard.open") },
+            { key: "pending", label: t("dashboard.waiting") },
+            { key: "resolved", label: t("dashboard.resolved") },
+            { key: "closed", label: t("dashboard.closed") },
           ] as const
         ).map((item) => (
           <button
@@ -133,7 +176,7 @@ export default function SupportPage() {
         ))}
       </div>
 
-      <GlassPanel title="گزارش تخلف" className="mt-4 md:mt-6">
+      <GlassPanel title={t("dashboard.reportViolation")} className="mt-4 md:mt-6">
         <form
           className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
           onSubmit={reportForm.handleSubmit((data) => {
@@ -142,7 +185,7 @@ export default function SupportPage() {
             });
           })}
         >
-          <LabeledField label="نوع مورد گزارش">
+          <LabeledField label={t("dashboard.reportTargetType")}>
             <select
               className="w-full rounded-xl border border-white/20 bg-transparent px-3 py-2 text-sm"
               {...reportForm.register("target_type")}
@@ -151,24 +194,25 @@ export default function SupportPage() {
                 reportForm.setValue("target_id", "");
               }}
             >
-              <option value="user">کاربر</option>
-              <option value="room">اتاق تماشا</option>
-              <option value="video">ویدیو</option>
-              <option value="message">پیام در اتاق</option>
+              {REPORT_TARGET_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {targetTypeLabel(t, type)}
+                </option>
+              ))}
             </select>
           </LabeledField>
 
           {targetType === "user" ? (
             <LabeledField
-              label="انتخاب کاربر"
-              hint="کاربری که می‌خواهید گزارش دهید"
+              label={t("dashboard.selectUserReport")}
+              hint={t("dashboard.selectUserReportHint")}
               error={reportForm.formState.errors.target_id?.message}
             >
               <select
                 className="w-full rounded-xl border border-white/20 bg-transparent px-3 py-2 text-sm"
                 {...reportForm.register("target_id")}
               >
-                <option value="">— انتخاب کنید —</option>
+                <option value="">{t("dashboard.selectPlaceholder")}</option>
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.display_name ?? u.phone_number} ({u.phone_number})
@@ -178,15 +222,15 @@ export default function SupportPage() {
             </LabeledField>
           ) : targetType === "room" ? (
             <LabeledField
-              label="انتخاب اتاق"
-              hint="اتاقی که تخلف در آن رخ داده"
+              label={t("dashboard.selectRoom")}
+              hint={t("dashboard.selectRoomHint")}
               error={reportForm.formState.errors.target_id?.message}
             >
               <select
                 className="w-full rounded-xl border border-white/20 bg-transparent px-3 py-2 text-sm"
                 {...reportForm.register("target_id")}
               >
-                <option value="">— انتخاب کنید —</option>
+                <option value="">{t("dashboard.selectPlaceholder")}</option>
                 {rooms.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
@@ -196,15 +240,15 @@ export default function SupportPage() {
             </LabeledField>
           ) : targetType === "video" ? (
             <LabeledField
-              label="انتخاب ویدیو"
-              hint="ویدیویی که محتوای نامناسب دارد"
+              label={t("dashboard.selectVideo")}
+              hint={t("dashboard.selectVideoHint")}
               error={reportForm.formState.errors.target_id?.message}
             >
               <select
                 className="w-full rounded-xl border border-white/20 bg-transparent px-3 py-2 text-sm"
                 {...reportForm.register("target_id")}
               >
-                <option value="">— انتخاب کنید —</option>
+                <option value="">{t("dashboard.selectPlaceholder")}</option>
                 {videos.map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.title || v.id.slice(-8)}
@@ -214,8 +258,8 @@ export default function SupportPage() {
             </LabeledField>
           ) : (
             <LabeledField
-              label="شناسه پیام"
-              hint="شناسه پیام را از تاریخچه چت اتاق کپی کنید"
+              label={t("dashboard.messageId")}
+              hint={t("dashboard.messageIdHint")}
               error={reportForm.formState.errors.target_id?.message}
             >
               <Input
@@ -227,8 +271,8 @@ export default function SupportPage() {
           )}
 
           <LabeledField
-            label="شرح گزارش"
-            hint="دقیق توضیح دهید چه اتفاقی افتاده"
+            label={t("dashboard.reportDescription")}
+            hint={t("dashboard.reportDescriptionHint")}
             error={reportForm.formState.errors.reason?.message}
             className="md:col-span-2"
           >
@@ -244,12 +288,12 @@ export default function SupportPage() {
             disabled={reportMut.isPending}
             className="rounded-xl bg-red-600/80 px-4 py-2 text-sm text-white disabled:opacity-50 md:col-span-2"
           >
-            {reportMut.isPending ? "در حال ارسال..." : "ارسال گزارش"}
+            {reportMut.isPending ? t("dashboard.sending") : t("dashboard.submitReport")}
           </button>
         </form>
       </GlassPanel>
 
-      <GlassPanel title="تیکت‌های من" className="mt-4 md:mt-6">
+      <GlassPanel title={t("dashboard.myTickets")} className="mt-4 md:mt-6">
         {filtered.length ? (
           <TicketsTable
             rows={filtered}
@@ -259,7 +303,7 @@ export default function SupportPage() {
             }}
           />
         ) : (
-          <EmptyState title="تیکتی نیست" />
+          <EmptyState title={t("dashboard.noTicketsShort")} />
         )}
       </GlassPanel>
 

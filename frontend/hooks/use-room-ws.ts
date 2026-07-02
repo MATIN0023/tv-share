@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
+import { getAuthToken } from "@/lib/api/session";
 import type { WsMessage } from "@/lib/api/types";
+import { useTranslation } from "@/providers/i18n-provider";
 
 type UseRoomWebSocketOptions = {
   roomId: string;
-  userId: string;
   enabled?: boolean;
   onMessage?: (msg: WsMessage) => void;
 };
@@ -17,10 +18,10 @@ function wsBaseUrl(): string {
 
 export function useRoomWebSocket({
   roomId,
-  userId,
   enabled = true,
   onMessage,
 }: UseRoomWebSocketOptions) {
+  const { t } = useTranslation();
   const [connected, setConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WsMessage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,10 +40,21 @@ export function useRoomWebSocket({
     [send]
   );
 
-  useEffect(() => {
-    if (!enabled || !roomId || !userId) return;
+  const sendReaction = useCallback(
+    (emoji: string) => send({ type: "reaction", emoji }),
+    [send]
+  );
 
-    const url = `${wsBaseUrl()}/ws?user_id=${encodeURIComponent(userId)}`;
+  useEffect(() => {
+    if (!enabled || !roomId) return;
+
+    const token = getAuthToken();
+    if (!token) {
+      setError(t("room.loginRequired"));
+      return;
+    }
+
+    const url = `${wsBaseUrl()}/ws?token=${encodeURIComponent(token)}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
@@ -62,14 +74,14 @@ export function useRoomWebSocket({
       }
     };
 
-    ws.onerror = () => setError("خطا در اتصال WebSocket");
+    ws.onerror = () => setError(t("room.wsConnectError"));
     ws.onclose = () => setConnected(false);
 
     return () => {
       ws.close();
       wsRef.current = null;
     };
-  }, [enabled, roomId, userId]);
+  }, [enabled, roomId, t]);
 
-  return { connected, lastMessage, error, send, sendChat };
+  return { connected, lastMessage, error, send, sendChat, sendReaction };
 }

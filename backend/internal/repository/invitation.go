@@ -10,6 +10,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"watch-party/internal/models"
+	"watch-party/internal/util"
 )
 
 func (r *Repository) CreateInvitation(ctx context.Context, roomID, code string, expiresAt time.Time, maxUses int) error {
@@ -30,7 +31,12 @@ func (r *Repository) CreateInvitation(ctx context.Context, roomID, code string, 
 	return err
 }
 
+func normalizeInviteCode(code string) string {
+	return util.NormalizeInviteCode(code)
+}
+
 func (r *Repository) GetInvitationByCode(ctx context.Context, code string) (*models.Invitation, error) {
+	code = normalizeInviteCode(code)
 	var inv models.Invitation
 	err := r.coll(collInvitations).FindOne(ctx, bson.M{"code": code}).Decode(&inv)
 	if err != nil {
@@ -54,6 +60,7 @@ func (r *Repository) ValidateInvitation(ctx context.Context, code string) (*mode
 }
 
 func (r *Repository) UseInvitation(ctx context.Context, code string) error {
+	code = normalizeInviteCode(code)
 	res, err := r.coll(collInvitations).UpdateOne(ctx,
 		bson.M{"code": code},
 		bson.M{"$inc": bson.M{"used_count": 1}},

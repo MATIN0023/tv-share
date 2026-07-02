@@ -1,9 +1,5 @@
-import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
+import { PageLoader } from "@/components/ui/app-loader";
 
 export default function DashboardLoading() {
-  return (
-    <div className="min-h-[60vh]">
-      <DashboardSkeleton />
-    </div>
-  );
+  return <PageLoader />;
 }

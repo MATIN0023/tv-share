@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "@/providers/i18n-provider";
+
 interface ModalShellProps {
   open: boolean;
   title: string;
@@ -15,6 +17,8 @@ export function ModalShell({
   onClose,
   children,
 }: ModalShellProps) {
+  const { t } = useTranslation();
+
   if (!open) return null;
 
   return (
@@ -32,7 +36,7 @@ export function ModalShell({
             onClick={onClose}
             className="rounded-lg border border-white/20 px-3 py-1.5 text-sm"
           >
-            بستن
+            {t("common.close")}
           </button>
         </div>
         {children}

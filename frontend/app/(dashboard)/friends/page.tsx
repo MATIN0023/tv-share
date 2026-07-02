@@ -8,7 +8,7 @@ import { SearchField } from "@/components/forms/search-field";
 import { FriendsTable } from "@/components/dashboard/tables/friends-table";
 import { ConfirmActionModal } from "@/components/dashboard/modals/confirm-action-modal";
 import { EmptyState } from "@/components/dashboard/shared/empty-state";
-import { ErrorState } from "@/components/dashboard/shared/error-state";
+import { QueryError } from "@/components/dashboard/shared/query-error";
 import { DashboardSkeleton } from "@/components/dashboard/shared/skeleton";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,10 +23,12 @@ import {
 } from "@/hooks/use-friends";
 import { useMe } from "@/hooks/use-me";
 import { formatFaDate } from "@/lib/utils/format-date";
+import { useTranslation } from "@/providers/i18n-provider";
 
 type Tab = "friends" | "received" | "sent" | "blocked";
 
 export default function FriendsPage() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>("friends");
   const [search, setSearch] = useState("");
   const [blockOpen, setBlockOpen] = useState(false);
@@ -63,9 +65,9 @@ export default function FriendsPage() {
         )
         .map((f) => ({
           id: f.friend_id,
-          name: f.friend_name || "کاربر",
+          name: f.friend_name || t("dashboard.userFallback"),
           subtitle: f.friend_id.slice(-8),
-          status: "دوست",
+          status: t("dashboard.friend"),
         }));
     }
     if (tab === "received") {
@@ -79,7 +81,7 @@ export default function FriendsPage() {
           id: r.from_user_id,
           name: userNameMap.get(r.from_user_id) ?? r.from_user_id.slice(-8),
           subtitle: formatFaDate(r.created_at),
-          status: "درخواست دریافتی",
+          status: t("dashboard.receivedRequest"),
         }));
     }
     if (tab === "blocked") {
@@ -93,7 +95,7 @@ export default function FriendsPage() {
           id: u.id,
           name: u.display_name || u.phone_number,
           subtitle: u.phone_number,
-          status: "مسدود",
+          status: t("dashboard.blockedStatus"),
         }));
     }
     return [];
@@ -104,24 +106,26 @@ export default function FriendsPage() {
     requestsQ.data,
     blockedQ.data,
     userNameMap,
+    t,
   ]);
 
   const isLoading =
     friendsQ.isLoading || requestsQ.isLoading || blockedQ.isLoading;
   const isError = friendsQ.isError || requestsQ.isError || blockedQ.isError;
+  const loadError = friendsQ.error ?? requestsQ.error ?? blockedQ.error;
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "friends", label: "دوستان من" },
-    { key: "received", label: "درخواست‌های دریافتی" },
-    { key: "sent", label: "درخواست‌های ارسالی" },
-    { key: "blocked", label: "مسدودها" },
+    { key: "friends", label: t("dashboard.myFriends") },
+    { key: "received", label: t("dashboard.receivedRequests") },
+    { key: "sent", label: t("dashboard.sentRequests") },
+    { key: "blocked", label: t("dashboard.blocked") },
   ];
 
   return (
     <div>
       <SectionHeader
-        title="دوستان"
-        description="مدیریت لیست دوستان، درخواست‌ها و کاربران مسدود — داده از API"
+        title={t("dashboard.friendsTitle")}
+        description={t("dashboard.friendsDesc")}
       />
 
       <div className="mb-4 flex flex-wrap gap-2 md:mb-6">
@@ -140,40 +144,45 @@ export default function FriendsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <GlassPanel title="دعوت دوست" description="با شناسه کاربر درخواست دوستی بفرست.">
+        <GlassPanel title={t("dashboard.inviteFriend")} description={t("dashboard.inviteFriendDesc")}>
           <button
             type="button"
             onClick={() => setInviteOpen(true)}
             className="mt-3 inline-flex items-center gap-2 rounded-xl liquid-glass px-3 py-2 text-sm"
           >
             <UserPlus className="size-4" />
-            ارسال درخواست
+            {t("dashboard.sendRequest")}
           </button>
           <button
             type="button"
             onClick={() => setBlockOpen(true)}
             className="mt-2 inline-flex rounded-xl border border-red-400/30 px-3 py-2 text-sm text-red-400"
           >
-            بلاک با شناسه
+            {t("dashboard.blockById")}
           </button>
         </GlassPanel>
         <GlassPanel
-          title="آمار"
-          description={`${friendsQ.data?.friends.length ?? 0} دوست · ${requestsQ.data?.pending.length ?? 0} درخواست`}
+          title={t("dashboard.stats")}
+          description={t("dashboard.friendsStats", {
+            friends: friendsQ.data?.friends.length ?? 0,
+            requests: requestsQ.data?.pending.length ?? 0,
+          })}
         />
-        <GlassPanel title="جستجوی کاربران" description="GET /api/users">
+        <GlassPanel title={t("dashboard.searchUsers")} description="GET /api/users">
           <div className="mt-3 inline-flex items-center gap-2 text-sm text-muted-foreground">
             <MessageCircle className="size-4" />
-            {usersQ.data?.users.length ?? 0} کاربر در سیستم
+            {t("dashboard.usersInSystem", {
+              count: usersQ.data?.users.length ?? 0,
+            })}
           </div>
         </GlassPanel>
       </div>
 
       <div className="mt-4 md:mt-6">
-        <GlassPanel title="لیست" description="داده زنده از /api/friends">
+        <GlassPanel title={t("dashboard.list")} description={t("dashboard.liveDataHint")}>
           <div className="mt-3">
             <SearchField
-              placeholder="جستجو..."
+              placeholder={t("dashboard.searchPlaceholder")}
               value={search}
               onChange={setSearch}
             />
@@ -181,8 +190,9 @@ export default function FriendsPage() {
           <div className="mt-3">
             {isLoading ? <DashboardSkeleton /> : null}
             {isError ? (
-              <ErrorState
-                title="خطا در دریافت دوستان"
+              <QueryError
+                error={loadError}
+                context="friends.load"
                 onRetry={() => {
                   friendsQ.refetch();
                   requestsQ.refetch();
@@ -192,8 +202,8 @@ export default function FriendsPage() {
             ) : null}
             {tab === "sent" ? (
               <EmptyState
-                title="درخواست ارسالی"
-                description="API فعلاً فقط درخواست‌های دریافتی را برمی‌گرداند."
+                title={t("dashboard.sentRequest")}
+                description={t("dashboard.sentRequestsNote")}
               />
             ) : null}
             {!isLoading && !isError && tab !== "sent" && filteredRows.length ? (
@@ -215,7 +225,7 @@ export default function FriendsPage() {
               />
             ) : null}
             {!isLoading && !isError && tab !== "sent" && !filteredRows.length ? (
-              <EmptyState title="موردی یافت نشد" />
+              <EmptyState title={t("dashboard.nothingFound")} />
             ) : null}
           </div>
         </GlassPanel>
@@ -224,9 +234,9 @@ export default function FriendsPage() {
       <ConfirmActionModal
         open={blockOpen}
         onClose={() => setBlockOpen(false)}
-        title="تایید بلاک کاربر"
-        description="شناسه کاربر را وارد کنید یا از لیست انتخاب کنید."
-        confirmLabel="بلاک"
+        title={t("dashboard.confirmBlockUser")}
+        description={t("dashboard.blockUserDesc")}
+        confirmLabel={t("dashboard.block")}
         onConfirm={() => {
           const id = blockTargetId.trim();
           if (id) blockUserMut.mutate(id);
@@ -234,7 +244,7 @@ export default function FriendsPage() {
         }}
       >
         <Input
-          placeholder="شناسه کاربر"
+          placeholder={t("dashboard.userId")}
           dir="ltr"
           className="mt-2 text-left"
           value={blockTargetId}
@@ -245,9 +255,9 @@ export default function FriendsPage() {
       <ConfirmActionModal
         open={inviteOpen}
         onClose={() => setInviteOpen(false)}
-        title="ارسال درخواست دوستی"
-        description="شناسه کاربر مقصد (از لیست /api/users)"
-        confirmLabel="ارسال"
+        title={t("dashboard.sendFriendRequest")}
+        description={t("dashboard.targetUserHint")}
+        confirmLabel={t("dashboard.send")}
         onConfirm={() => {
           if (inviteUserId.trim()) sendReq.mutate(inviteUserId.trim());
           setInviteOpen(false);
@@ -262,7 +272,7 @@ export default function FriendsPage() {
         />
         {me ? (
           <p className="mt-2 text-xs text-muted-foreground" dir="ltr">
-            شما: {me.id}
+            {t("dashboard.youLabel", { id: me.id })}
           </p>
         ) : null}
       </ConfirmActionModal>

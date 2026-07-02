@@ -2,14 +2,17 @@
 "use client";
 import React from "react";
 import Link from "next/link";
+import { AppLogo } from "@/components/brand/app-logo";
 import { motion } from "framer-motion";
+import { useTranslation } from "@/providers/i18n-provider";
 
 export function Footer() {
+  const { t } = useTranslation();
+
   return (
     <footer className="bg-white dark:bg-black border-t border-gray-200 dark:border-gray-800">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Logo & Description */}
           <div className="md:col-span-2">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -17,17 +20,19 @@ export function Footer() {
               transition={{ duration: 0.5 }}
               viewport={{ once: true }}
             >
-              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 mb-4">
-               مــــــــــــوی ســـــــــینک
-              </h3>
+              <AppLogo
+                href="/"
+                size={40}
+                name={t("common.appName")}
+                nameClassName="text-xl bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent"
+                className="mb-4"
+              />
               <p className="text-gray-600 dark:text-gray-400 max-w-md">
-                بهترین پلتفرم تماشای آنلاین فیلم و سریال با امکان تماشای گروهی
-                و چت زنده
+                {t("landing.footerDesc")}
               </p>
             </motion.div>
           </div>
 
-          {/* Quick Links */}
           <div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -36,7 +41,7 @@ export function Footer() {
               viewport={{ once: true }}
             >
               <h4 className="text-lg font-semibold text-black dark:text-white mb-4">
-                دسترسی سریع
+                {t("nav.quickLinks")}
               </h4>
               <ul className="space-y-2">
                 <li>
@@ -44,7 +49,7 @@ export function Footer() {
                     href="/"
                     className="text-gray-600 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
                   >
-                    صفحه اصلی
+                    {t("nav.home")}
                   </Link>
                 </li>
                 <li>
@@ -52,7 +57,7 @@ export function Footer() {
                     href="/login"
                     className="text-gray-600 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
                   >
-                    ورود
+                    {t("common.login")}
                   </Link>
                 </li>
                 <li>
@@ -60,14 +65,13 @@ export function Footer() {
                     href="/signup"
                     className="text-gray-600 dark:text-gray-400 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
                   >
-                    ثبت‌نام
+                    {t("common.signup")}
                   </Link>
                 </li>
               </ul>
             </motion.div>
           </div>
 
-          {/* Contact */}
           <div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -76,7 +80,7 @@ export function Footer() {
               viewport={{ once: true }}
             >
               <h4 className="text-lg font-semibold text-black dark:text-white mb-4">
-                ارتباط با ما
+                {t("nav.contactUs")}
               </h4>
               <ul className="space-y-2">
                 <li>
@@ -99,14 +103,13 @@ export function Footer() {
                 </li>
                 <li className="text-gray-600 dark:text-gray-400 flex items-center gap-2">
                   <span>📍</span>
-                  تهران، ایران
+                  {t("nav.location")}
                 </li>
               </ul>
             </motion.div>
           </div>
         </div>
 
-        {/* Bottom Bar */}
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -116,7 +119,7 @@ export function Footer() {
         >
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-gray-600 dark:text-gray-400 text-sm text-center md:text-right">
-              © {new Date().getFullYear()} تمامی حقوق محفوظ است
+              {t("nav.copyright", { year: new Date().getFullYear() })}
             </p>
             <div className="flex gap-6">
               <a

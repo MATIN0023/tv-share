@@ -5,6 +5,7 @@ import DatePicker, { type DateObject } from "react-multi-date-picker";
 import persian from "react-date-object/calendars/persian";
 import persian_fa from "react-date-object/locales/persian_fa";
 import { CalendarDays } from "lucide-react";
+import { useTranslation } from "@/providers/i18n-provider";
 
 interface DateTimeFieldProps {
   value?: string;
@@ -12,13 +13,14 @@ interface DateTimeFieldProps {
 }
 
 export function DateTimeField({ value, onChange }: DateTimeFieldProps) {
+  const { t } = useTranslation();
   const dateValue = useMemo(() => (value ? new Date(value) : undefined), [value]);
 
   return (
     <div className="rounded-xl border border-white/10 p-2">
       <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
         <CalendarDays className="size-4" />
-        زمان‌بندی (تقویم شمسی)
+        {t("forms.scheduleLabel")}
       </div>
       <DatePicker
         value={dateValue}
@@ -30,12 +32,11 @@ export function DateTimeField({ value, onChange }: DateTimeFieldProps) {
         locale={persian_fa}
         calendarPosition="bottom-right"
         format="YYYY/MM/DD HH:mm"
+        editable={false}
         inputClass="w-full h-8 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm text-right outline-none"
         containerClassName="w-full"
       />
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        خروجی این فیلد به‌صورت ISO ذخیره می‌شود و برای API آماده است.
-      </p>
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("forms.scheduleHint")}</p>
     </div>
   );
 }

@@ -36,6 +36,25 @@ export async function verifyOTP(payload: OTPVerifyPayload): Promise<AuthResponse
   });
 }
 
+export async function googleLogin(payload: {
+  id_token: string;
+}): Promise<AuthResponse> {
+  return apiRequest<AuthResponse>("/auth/google", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await authApiRequest<{ message: string }>("/api/auth/logout", {
+      method: "POST",
+    });
+  } catch {
+    // Always clear local session even if server call fails
+  }
+}
+
 export async function getMe(): Promise<UserProfile> {
   return authApiRequest<UserProfile>("/api/users/me");
 }

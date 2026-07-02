@@ -66,7 +66,9 @@ func (r *Repository) CreateUser(ctx context.Context, user *models.User) error {
 		user.SubscriptionPlan = models.SubscriptionPlanFree
 	}
 	user.IsActive = true
-	user.PhoneNumber = phone.Normalize(user.PhoneNumber)
+	if user.PhoneNumber != "" {
+		user.PhoneNumber = phone.Normalize(user.PhoneNumber)
+	}
 	_, err := r.coll(collUsers).InsertOne(ctx, user)
 	return err
 }
@@ -180,6 +182,19 @@ func (r *Repository) TouchLastLogin(ctx context.Context, id string) error {
 	return r.UpdateUser(ctx, id, bson.M{"last_login_at": now})
 }
 
+// InvalidateUserSessions bumps token_version so all existing JWTs for this user are rejected.
+func (r *Repository) InvalidateUserSessions(ctx context.Context, userID string) error {
+	oid, err := parseObjectID(userID)
+	if err != nil {
+		return err
+	}
+	_, err = r.coll(collUsers).UpdateByID(ctx, oid, bson.M{
+		"$inc": bson.M{"token_version": 1},
+		"$set": bson.M{"updated_at": models.NowUTC()},
+	})
+	return err
+}
+
 func (r *Repository) BlockUser(ctx context.Context, userID, blockedID string) error {
 	uid, err := parseObjectID(userID)
 	if err != nil {
@@ -219,24 +234,43 @@ func (r *Repository) ListBlockedUsers(ctx context.Context, userID string) ([]mod
 	return users, nil
 }
 
-func (r *Repository) EnsureDefaultUser(ctx context.Context) error {
+func (r *Repository) EnsureDefaultUser(ctx context.Context, adminPhone, adminPassword, testPhone, testPassword string) error {
 	if err := r.MigrateRemoveUsername(ctx); err != nil {
 		return err
 	}
-	const defaultPhone = "09123456789"
-	const defaultPassword = "Admin123"
+	if adminPhone == "" || adminPassword == "" {
+		return nil
+	}
 
-	if _, err := r.GetUserByPhone(ctx, defaultPhone); err == nil {
+	if _, err := r.GetUserByPhone(ctx, adminPhone); err == nil {
+		return r.ensureTestUser(ctx, testPhone, testPassword)
+	} else if !errors.Is(err, mongo.ErrNoDocuments) {
+		return err
+	}
+
+	user, err := r.CreateUserWithPassword(ctx, adminPhone, adminPassword, "Admin User")
+	if err != nil {
+		return err
+	}
+	if err := r.UpdateUser(ctx, user.ID.Hex(), bson.M{"role": models.RoleAdmin}); err != nil {
+		return err
+	}
+	return r.ensureTestUser(ctx, testPhone, testPassword)
+}
+
+func (r *Repository) ensureTestUser(ctx context.Context, testPhone, testPassword string) error {
+	if testPhone == "" || testPassword == "" {
+		return nil
+	}
+
+	if _, err := r.GetUserByPhone(ctx, testPhone); err == nil {
 		return nil
 	} else if !errors.Is(err, mongo.ErrNoDocuments) {
 		return err
 	}
 
-	user, err := r.CreateUserWithPassword(ctx, defaultPhone, defaultPassword, "Admin User")
-	if err != nil {
-		return err
-	}
-	return r.UpdateUser(ctx, user.ID.Hex(), bson.M{"role": models.RoleAdmin})
+	_, err := r.CreateUserWithPassword(ctx, testPhone, testPassword, "Test User")
+	return err
 }
 
 // MigrateRemoveUsername strips legacy username field from all user documents.

@@ -46,6 +46,16 @@ export async function apiRequest<T>(
       (data && typeof data === "object" && "error" in data
         ? String((data as { error: string }).error)
         : null) ?? res.statusText;
+
+    if (typeof window !== "undefined" && res.status === 401 && token) {
+      const { clearSession } = await import("./session");
+      clearSession();
+      if (!window.location.pathname.startsWith("/login")) {
+        const redirect = encodeURIComponent(window.location.pathname);
+        window.location.href = `/login?reason=session_expired&redirect=${redirect}`;
+      }
+    }
+
     throw new ApiError(message, res.status, data);
   }
 

@@ -1,4 +1,6 @@
 import { authApiRequest } from "./authenticated";
+import { API_BASE_URL, ApiError } from "./client";
+import { getAuthToken } from "./session";
 import type {
   AdminRoom,
   AdminStats,
@@ -8,6 +10,8 @@ import type {
   Plan,
   Report,
   SystemSettings,
+  Ticket,
+  TicketMessage,
   Transaction,
   UserProfile,
 } from "./types";
@@ -221,10 +225,73 @@ export function deleteAdminDiscount(id: string) {
   });
 }
 
-export function listAdminLogs(params?: { page?: number; limit?: number }) {
+export function listAdminLogs(params?: { page?: number; limit?: number; role?: string }) {
   return authApiRequest<PaginatedResult<AuditLog>>(
-    `/api/admin/logs${qs({ page: params?.page, limit: params?.limit })}`
+    `/api/admin/logs${qs({ page: params?.page, limit: params?.limit, role: params?.role })}`
   );
+}
+
+export function listAdminTickets(params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+}) {
+  return authApiRequest<PaginatedResult<Ticket>>(
+    `/api/admin/tickets${qs({ page: params?.page, limit: params?.limit, status: params?.status })}`
+  );
+}
+
+export function getAdminTicket(id: string) {
+  return authApiRequest<{ ticket: Ticket; messages: TicketMessage[] }>(
+    `/api/tickets/${id}`
+  );
+}
+
+export function adminReplyTicket(id: string, body: string) {
+  return authApiRequest<TicketMessage>(`/api/admin/tickets/${id}/messages`, {
+    method: "POST",
+    body: { body },
+  });
+}
+
+export function adminUpdateTicketStatus(id: string, status: string) {
+  return authApiRequest<{ status: string }>(`/api/admin/tickets/${id}/status`, {
+    method: "PUT",
+    body: { status },
+  });
+}
+
+export function exportAdminRoomChat(
+  id: string,
+  format: "txt" | "csv" = "txt",
+  zip = false
+): Promise<Blob> {
+  const token = getAuthToken();
+  const params = new URLSearchParams({ format });
+  if (zip) params.set("zip", "1");
+  return fetch(
+    `${API_BASE_URL}/api/admin/rooms/${id}/export-chat?${params.toString()}`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+  ).then(async (res) => {
+    if (!res.ok) {
+      const text = await res.text();
+      let message = res.statusText;
+      try {
+        const data = JSON.parse(text);
+        if (data?.error) message = String(data.error);
+      } catch {
+        /* ignore */
+      }
+      throw new ApiError(message, res.status);
+    }
+    return res.blob();
+  });
+}
+
+export function deleteAdminRoom(id: string) {
+  return authApiRequest<{ message: string }>(`/api/admin/rooms/${id}`, {
+    method: "DELETE",
+  });
 }
 
 export function createReport(body: {

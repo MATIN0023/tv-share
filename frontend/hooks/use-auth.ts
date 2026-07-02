@@ -2,11 +2,20 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
+
+function resolvePostLoginRoute(role: string): string {
+  if (role === "admin" || role === "superadmin") return "/admin";
+  if (typeof window !== "undefined" && !localStorage.getItem("ms-onboarded")) {
+    return "/welcome";
+  }
+  return "/dashboard";
+}
 import {
   login,
   register,
   verifyOTP,
   requestOTP,
+  logout,
   persistSession,
   clearSession,
   queryKeys,
@@ -25,7 +34,7 @@ export function useLoginMutation() {
     onSuccess: (auth) => {
       persistSession(auth);
       queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      router.push("/dashboard");
+      router.push(resolvePostLoginRoute(auth.role));
     },
   });
 }
@@ -39,7 +48,8 @@ export function useRegisterMutation() {
     onSuccess: (auth) => {
       persistSession(auth);
       queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      router.push("/dashboard");
+      // new users → onboarding; existing → dashboard
+      router.push(auth.is_new_user ? "/welcome" : resolvePostLoginRoute(auth.role));
     },
   });
 }
@@ -59,7 +69,7 @@ export function useVerifyOTPMutation() {
     onSuccess: (auth) => {
       persistSession(auth);
       queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      router.push("/dashboard");
+      router.push(auth.is_new_user ? "/welcome" : resolvePostLoginRoute(auth.role));
     },
   });
 }
@@ -68,7 +78,8 @@ export function useLogout() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  return () => {
+  return async () => {
+    await logout();
     clearSession();
     queryClient.clear();
     router.push("/login");
